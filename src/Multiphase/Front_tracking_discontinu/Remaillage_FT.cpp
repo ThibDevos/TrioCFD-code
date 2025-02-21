@@ -68,7 +68,7 @@ Remaillage_FT::Remaillage_FT() :
   lissage_courbure_iterations_si_remaillage_(0),
   lissage_courbure_iterations_old_(-1),
   lissage_critere_(0), // Default value to 0, when lissage is applied, it is for the whole mesh
-  is_solid_particle_(0)
+  is_solid_particle_(1) // force solid
 {
 }
 
@@ -3763,5 +3763,5 @@ void Remaillage_FT::regulariser_courbure(Maillage_FT_Disc& maillage,
 }
 void Remaillage_FT::set_is_solid_particle(int is_solid_particle)
 {
-  is_solid_particle_=is_solid_particle;
+  is_solid_particle_= 1; //is_solid_particle; // force solid particle
 }

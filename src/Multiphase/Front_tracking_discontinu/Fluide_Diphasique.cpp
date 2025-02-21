@@ -40,12 +40,13 @@ Entree& Fluide_Diphasique::readOn(Entree& is) { return Milieu_base::readOn(is); 
 
 void Fluide_Diphasique::set_param(Param& param)
 {
+
   param.ajouter("sigma", &sigma_, Param::REQUIRED); // XD_ADD_P champ_don_base surfacic tension (J/m2)
   param.ajouter("fluide0|phase0", &phase0_, Param::REQUIRED); // XD_ADD_P fluid_diph_lu first phase fluid
   param.ajouter("fluide1|phase1", &phase1_, Param::REQUIRED); // XD_ADD_P fluid_diph_lu second phase fluid
   param.ajouter("chaleur_latente", &chaleur_latente_); // XD_ADD_P champ_don_base phase changement enthalpy h(phase1_) - h(phase0_) (J/kg/K)
   param.ajouter("formule_mu", &formule_mu_); // XD_ADD_P chaine (into=[standard,arithmetic,harmonic]) formula used to calculate average
-  if  sub_type(Particule_Solide, phase0_.valeur()) is_solid_particle_=true;
+  //if  sub_type(Particule_Solide, phase0_.valeur()) is_solid_particle_=true; // phase0_ is not initialized arrived at this line 19/02/2025
   Milieu_base::set_additional_params(param); // XD ref gravite field_base
 }
 
@@ -129,6 +130,13 @@ int Fluide_Diphasique::initialiser(const double temps)
   phase0_->initialiser(temps);
   phase1_->initialiser(temps);
   initialiser_porosite(temps);
+
+  Cerr << "Initialize is_solid_particle_" << finl;
+  Cerr << "set from: " << static_cast<int>(is_solid_particle_) << finl;
+  if  sub_type(Particule_Solide, phase0_.valeur())
+    is_solid_particle_=true;
+  Cerr << "set to: " << static_cast<int>(is_solid_particle_) << finl;
+
   return 1;
 }
 

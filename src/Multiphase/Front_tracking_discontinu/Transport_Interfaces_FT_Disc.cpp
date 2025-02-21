@@ -1814,8 +1814,14 @@ void Transport_Interfaces_FT_Disc::discretiser()
     marching_cubes().associer_domaine_vf(domaine_vf);
   }
   maillage_interface().associer_equation_transport(*this);
+
+  Cerr << "\033[33;1mIn transport_interface:" << finl;
+  Cerr << "\tset is_solid_particle: " << is_solid_particle() << finl;
+  Cerr << "\tto maillage interface and remaillage interface\033[0m" << finl;
+
   maillage_interface().set_is_solid_particle(is_solid_particle()); // EB
   remaillage_interface().set_is_solid_particle(is_solid_particle()); // EB
+
   collision_interface_particule().associer_equation_transport(*this); // EB
   remaillage_interface().associer_domaine(domaine_dis());
   variables_internes_->algorithmes_transport_.typer("Algorithmes_Transport_FT_Disc");
@@ -12028,11 +12034,13 @@ int Transport_Interfaces_FT_Disc::get_nb_compo_tot () const
 }
 int Transport_Interfaces_FT_Disc::is_solid_particle()
 {
-  return variables_internes_->is_solid_particle_;
+  //return variables_internes_->is_solid_particle_;
+  return 1; // force solid particle
 }
 int Transport_Interfaces_FT_Disc::is_solid_particle() const
 {
-  return variables_internes_->is_solid_particle_;
+  //return variables_internes_->is_solid_particle_;
+  return 1; // force solid particle
 }
 const int& Transport_Interfaces_FT_Disc::postraiter_indicatrice_aretes() const { return postraiter_indicatrice_arete_; }
 // fin EB

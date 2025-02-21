@@ -897,6 +897,7 @@ int Navier_Stokes_FT_Disc::impr_fpi(Sortie& os) const
       const Transport_Interfaces_FT_Disc& eq_transport = refeq_transport.valeur();
       if (eq_transport.is_solid_particle())
         {
+          std::cout << "Transport_Interfaces_FT_Disc::IS_SOLID_PARTICLE" << std::endl;
           const Postraitement_Forces_Interfaces_FT& les_post_interf=eq_transport.postraitement_forces_interf();
 
           if (les_post_interf.postraiter_forces())

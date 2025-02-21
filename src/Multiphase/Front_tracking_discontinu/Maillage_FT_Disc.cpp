@@ -999,6 +999,8 @@ void Maillage_FT_Disc::calcul_indicatrice(DoubleVect& indicatrice,
   // Il reste dans elements_calcules[i] == 0 les voisins de l'interface
   if (!is_solid_particle_ || (is_solid_particle_ && nb_compo_tot==1))
     {
+      Cerr << "Is solid particl: " << is_solid_particle_ << " nb_compo_tot: " << nb_compo_tot << finl;
+
       const DoubleTab& distance = equation_transport().get_update_distance_interface().valeurs();
       int i;
       int error_count = 0;

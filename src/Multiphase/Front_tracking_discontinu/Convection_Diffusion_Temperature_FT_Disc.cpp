@@ -2173,6 +2173,7 @@ double Convection_Diffusion_Temperature_FT_Disc::get_Twall(const int num_face) c
  * Pour chaque facette lagrangienne, calcul de (lambda grad (T)) par un schema decentre avant d'ordre 2
  *
  */
+
 void Convection_Diffusion_Temperature_FT_Disc::calcul_flux_interface()
 {
   Cerr << "Convection_Diffusion_Temperature_FT_Disc::calcul_flux_interface"  <<  finl;
@@ -2304,17 +2305,93 @@ void Convection_Diffusion_Temperature_FT_Disc::calcul_flux_interface()
                       T_P2_moy(compo)+=temp_P2(fa7);
                     }
 
+
                   // On recalcule delta --> epsilon
-                  int elem_diph=domaine.chercher_elements(les_cg_fa7(fa7,0), les_cg_fa7(fa7,1),les_cg_fa7(fa7,2));
+                  int elem_diph = domaine.chercher_elements(
+                                    les_cg_fa7(fa7, 0),
+                                    les_cg_fa7(fa7, 1),
+                                    les_cg_fa7(fa7, 2));
+
                   DoubleVect delta_i(dimension);
-                  delta_i(0) = fabs(domaine_vdf.dist_elem(elem_diph, domaine_vdf.face_voisins(domaine_vdf.elem_faces(elem_diph, 0+dimension),1), 0));
-                  delta_i(1) = fabs(domaine_vdf.dist_elem(elem_diph, domaine_vdf.face_voisins(domaine_vdf.elem_faces(elem_diph, 1+dimension),1), 1));
-                  if (les_normales_fa7(fa7,2)>0) delta_i(2) = fabs(domaine_vdf.dist_elem(elem_diph, domaine_vdf.face_voisins(domaine_vdf.elem_faces(elem_diph, 2+dimension),1), 2));
-                  else delta_i(2) = fabs(domaine_vdf.dist_elem(elem_diph, domaine_vdf.face_voisins(domaine_vdf.elem_faces(elem_diph, 2),0), 2));
-                  double epsilon=0;
-                  for (int dim=0; dim<dimension; dim++) epsilon+= fabs(delta_i(dim)*fabs(les_normales_fa7(fa7,dim))); // la distance d'interpolation varie en fonction du raffinement du maillage
-                  flux_cond_interf(fa7)=lambda_f*(-temp_P2(fa7)+4.*temp_P1(fa7)-3.*TSAT_CONSTANTE)/(2.*epsilon)*les_surfaces_fa7(fa7); // schema decentre avant d'ordre 2
-                  flux_tot_conductif(compo)+=flux_cond_interf(fa7);
+
+                  // on x axis
+                  int x_neighbor = domaine_vdf.face_voisins(
+                                     domaine_vdf.elem_faces(elem_diph, 0 + dimension),
+                                     1);
+
+                  // on y axis
+                  int y_neighbor = domaine_vdf.face_voisins(
+                                     domaine_vdf.elem_faces(elem_diph, 1 + dimension),
+                                     1);
+
+                  // on z axis
+                  // here depending on the normal orientation we take the element on one side or the other
+                  int z_neighbor;
+                  if(les_normales_fa7(fa7, 2) > 0)
+                    z_neighbor = domaine_vdf.face_voisins(
+                                   domaine_vdf.elem_faces(elem_diph, 2 + dimension),
+                                   1);
+
+                  else
+                    z_neighbor = domaine_vdf.face_voisins(
+                                   domaine_vdf.elem_faces(elem_diph, 2),
+                                   0);
+
+                  // if one neighbor failed to be found, we take the distance as
+                  // one other axis distance
+                  // if searching for all neighbors failed, set flux as null
+                  if (x_neighbor < 0)
+                    {
+                      if (y_neighbor >= 0) x_neighbor = y_neighbor;
+                      else                 x_neighbor = z_neighbor;
+
+
+                      Cerr << "x_neighbor neg" << finl;
+                    }
+
+                  if (y_neighbor < 0)
+                    {
+                      if (x_neighbor >= 0) y_neighbor = x_neighbor;
+                      else                 y_neighbor = z_neighbor;
+
+                      Cerr << "y_neighbor neg" << finl;
+                    }
+
+                  if (z_neighbor < 0)
+                    {
+                      if (x_neighbor >= 0) z_neighbor = x_neighbor;
+                      else                 z_neighbor = y_neighbor;
+
+                      Cerr << "z_neighbor neg" << finl;
+                    }
+
+                  // we then compute the distance between elem_diph and each neighbor on each axis
+                  if (x_neighbor >= 0) delta_i(0) = fabs(domaine_vdf.dist_elem(elem_diph, x_neighbor, 0));
+                  else                 delta_i(0) = 0;
+
+                  if (y_neighbor >= 0)
+                    delta_i(1) = fabs(domaine_vdf.dist_elem(elem_diph, y_neighbor, 1));
+                  else
+                    delta_i(1) = 0;
+
+                  if (z_neighbor >= 0)
+                    delta_i(2) = fabs(domaine_vdf.dist_elem(elem_diph, z_neighbor, 2));
+                  else
+                    delta_i(2) = 0;
+
+                  // we then compute the norm
+
+                  double epsilon = 0;
+                  for(int dim = 0; dim < dimension; dim++)
+                    epsilon += fabs(delta_i(dim) * les_normales_fa7(fa7, dim));
+
+                  // la distance d'interpolation varie en fonction du raffinement du maillage
+                  // schema decentre avant d'ordre 2
+                  flux_cond_interf(fa7) = lambda_f * (-temp_P2(fa7) +4.*temp_P1(fa7) -3.*TSAT_CONSTANTE) / (2.*epsilon) * les_surfaces_fa7(fa7);
+
+                  // lambda_f* (1+epsilon/rayon_compo(compo))*(temp_P1(fa7)-TSAT_CONSTANTE)/epsilon *les_surfaces_fa7(fa7);
+                  flux_tot_conductif(compo) += flux_cond_interf(fa7);
+
                 }
             }
         }

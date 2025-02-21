@@ -426,7 +426,6 @@ private:
   // Variables internes a la methode de transport
   Transport_Interfaces_FT_Disc_interne *variables_internes_;
 
-
   double temps_debut_;
 
   OBS_PTR(Milieu_base) ref_milieu_;
@@ -447,7 +446,7 @@ public:
     indicatrice_face_cache_tag(-1),
     indicatrice_arete_cache_tag(-1),
     fichier_reprise_collision_FT_(""),
-    is_solid_particle_(0),
+    is_solid_particle_(1), // force solid
     iterations_correction_volume(0),
     VOFlike_correction_volume(0),
     nb_lissage_correction_volume(0),
