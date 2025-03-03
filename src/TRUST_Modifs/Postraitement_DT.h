@@ -25,7 +25,6 @@
  * The header of the file is created during readOn and a new line is added everytime
  * the 'postraiter' method is called.
  */
-
 class Postraitement_DT : public Postraitement {
 
 		/////////////////
@@ -69,11 +68,9 @@ class Postraitement_DT : public Postraitement {
 
 		// two auxilary methods to format floating points and text values into columns
 		template <class Float>
-		void write_float_column(
-			char buffer[], size_t size, const Float value) const;
+		std::string write_float_column(const Float value) const;
 
-		void write_text_column(
-			char buffer[], size_t size, const char text[]) const;
+		std::string write_text_column(const char text[]) const;
 
 		////////////////
 		// attributes //

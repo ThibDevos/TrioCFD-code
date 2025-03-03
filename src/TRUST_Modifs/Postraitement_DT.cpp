@@ -14,6 +14,7 @@
 *****************************************************************************/
 
 #include <vector>
+#include <iomanip>
 
 #include <Postraitement_DT.h>
 #include <SFichier.h>
@@ -46,10 +47,6 @@ Entree& Postraitement_DT::readOn(Entree& is) {
 	SFichier file;
 	file.ouvrir(nom_fich(), ios::out);
 
-	// allocate memory for a text buffer
-	size_t buffer_size = static_cast<size_t>(std::max(100, column_width + column_gap + 1));
-	char* buffer = new char[buffer_size];
-
 	// Write description
 	file << "File generated from Postraitement_DT class.\n\n";
 
@@ -57,17 +54,19 @@ Entree& Postraitement_DT::readOn(Entree& is) {
 	file << "This file contains the time steps computed for each equations, has well has the minimum, maximum and effective time steps.\n";
 	file << "All values are in seconds.\n\n";
 
-	// Write equations
+	// Write equations type and name
 	file << format("Equations [type and name]:\n", "\033[1m");
 	for (int index = 0; index < problem.nombre_d_equations(); index++) {
 		const Nom& equation_type = problem.equation(index).que_suis_je();
 		const Nom& equation_name = problem.equation(index).le_nom();
 
-		// Print equation type and name using tab
-		snprintf(buffer , buffer_size, "\t%-47s\t%-15s\n",
-			&(*equation_type),
-			&(*equation_name));
-		file << buffer;
+		std::ostringstream oss;
+		oss << "\t" << std::left << std::setw(47) << equation_type 
+			<< std::setw(column_gap) << "";
+		oss << std::left << std::setw(column_width) <<equation_name 
+			<< std::setw(column_gap) << "\n";
+
+		file << oss.str();
 	}
 	file << "\n";
 
@@ -95,31 +94,22 @@ Entree& Postraitement_DT::readOn(Entree& is) {
 	if (formatting_flag)
 		file << "\033[1m"; // bold
 
-	write_text_column(buffer, buffer_size, "Time");
-	file << buffer;
+	//write_text_column(buffer, buffer_size, "Time");
+	file << write_text_column("Time");
 
 	for (int index = 0; index < mon_probleme.valeur().nombre_d_equations(); index++) {
 		const Nom& equation_name = problem.equation(index).le_nom();
-		write_text_column(buffer, buffer_size, &(*equation_name));
-		file << buffer;
+		file << write_text_column(&(*equation_name));
 	}
 
-	write_text_column(buffer, buffer_size, "Minimum");
-	file << buffer;
-
-	write_text_column(buffer, buffer_size, "Maximum");
-	file << buffer;
-
-	write_text_column(buffer, buffer_size, "Effective");
-	file << buffer;
+	file << write_text_column("Minimum");
+	file << write_text_column("Maximum");
+	file << write_text_column("Effective");
 
 	if (formatting_flag)
 		file << "\033[0m"; // normal
 
 	file << "\n";
-
-	// free the buffer 
-	delete[] buffer;
 
 	// close the file
 	file.close();
@@ -172,14 +162,9 @@ void Postraitement_DT::postraiter(int) {
 	SFichier file;
 	file.ouvrir(nom_fich(), ios::app);
 
-	// allocate memory for a text buffer
-	size_t buffer_size = column_width + column_gap + 1;
-	char* buffer = new char[buffer_size];
-
 	// Get current simulation time and write it to the file 
 	double current_time = time_scheme.temps_courant();
-	write_float_column(buffer, buffer_size, current_time);
-	file << buffer;
+	file << write_float_column(current_time);
 
 	// get all time steps (equations, minimum, maximum and effective time steps)
 	std::vector<double> time_steps;
@@ -210,15 +195,12 @@ void Postraitement_DT::postraiter(int) {
 			formatter = get_formatter(Postraitement_DT::Extrema::Max);
 
 		// write the value in the buffer
-		write_float_column(buffer, buffer_size, time_step);
+		std::string text = write_float_column(time_step);
 
 		// write to the files with formatter
-		file << format(buffer, formatter);
+		file << format(text, formatter);
 	}
 	file << "\n";
-
-	// free the buffer 
-	delete[] buffer;
 
 	// close the file
 	file.close();
@@ -264,21 +246,23 @@ std::string Postraitement_DT::format(
  * greater than 1, ensuring a fixed column width with a trailing gap.
  * 
  * @tparam Float Floating point type (e.g., float, double).
- * @param buffer Character buffer to store the formatted output.
- * @param size Size of the buffer.
  * @param value Floating point value to format.
+ * @return std::string The formatted string.
  */
 template <class Float>
-void Postraitement_DT::write_float_column(
-		char buffer[], size_t size, const Float value) const {
+std::string Postraitement_DT::write_float_column(
+		//char buffer[], size_t size, const Float value) const {
+		const Float value) const {
 
-	// check template type
+	// Ensure Float is a floating-point type
 	static_assert(std::is_floating_point<Float>::value, "write_float_column requires a floating-point type (float or double).");
 
-	// format the value using snprintf and add a gap (the column gap) at the end
-	snprintf(buffer, size, "%-*.*e%*s",
-		column_width, number_of_decimals, value,
-		column_gap, "");
+	std::ostringstream oss;
+	oss << std::scientific << std::setprecision(number_of_decimals)
+		<< std::setw(column_width) << value
+		<< std::setw(column_gap) << "";
+	
+	return oss.str();
 }
 
 /**
@@ -286,15 +270,16 @@ void Postraitement_DT::write_float_column(
  * 
  * This function formats a text string into a fixed-width column with a trailing gap.
  * 
- * @param buffer Character buffer to store the formatted output.
- * @param size Size of the buffer.
  * @param text Text string to format.
+ * @return std::string The formatted string.
  */
-void Postraitement_DT::write_text_column(
-		char buffer[], size_t size, const char text[]) const {
+std::string Postraitement_DT::write_text_column(
+		//char buffer[], size_t size, const char text[]) const {
+		const char text[]) const {
 
-	// format the text using snprintf and add a gap (the column gap) at the end
-	snprintf(buffer, size, "%-*s%*s",
-		column_width, text,
-		column_gap, "");
+	std::ostringstream oss;
+	oss << std::left << std::setw(column_width) << text
+		<< std::setw(column_gap) << "";
+
+	return oss.str();
 }
