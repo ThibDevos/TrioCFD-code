@@ -1174,7 +1174,7 @@ void Maillage_FT_Disc::calcul_indicatrice(DoubleVect& indicatrice,
         if (i < nb_face)
           {
             int orientation=domaine_vf.orientation(i);
-            int index;
+            int index = 0;
             if (orientation==0) index=index_face_x[i];
             else if (orientation==1) index=index_face_y[i];
             else if (orientation==2) index=index_face_z[i];
@@ -1560,7 +1560,7 @@ void Maillage_FT_Disc::calcul_indicatrice_arete(const DoubleVect& indicatrice, D
         int check_voisins = ( ((x != 0.) && (x != 1.)));
 
         int orientation=(dimension-1)-orientation_aretes(i);
-        int index;
+        int index = 0;
         if (orientation==0) index=index_arete_x[i];
         else if (orientation==1) index=index_arete_y[i];
         else if (orientation==2) index=index_arete_z[i];
