@@ -153,6 +153,10 @@ void Postraitement_DT::set_param(Param& param) {
  * for each equation of the problem to the output file.
  */
 void Postraitement_DT::postraiter(int) {
+
+	// only the master process write in the file
+	if (!Process::je_suis_maitre())
+		return;
 	
 	// get problem and time scheme
 	const Probleme_base& problem = ref_cast(Probleme_base, mon_probleme.valeur());
