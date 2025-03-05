@@ -42,12 +42,13 @@ class Postraitement_DT : public Postraitement {
 	public:
 		
 		// This enum is used in formatting function to specify whether the value
-		// that need to be formated needs to be formatted as a the minimum, maximum
-		// or as the effective timestep value.
-		enum Extrema {
+		// that need to be formated needs to be formatted as a the minimum, maximum,
+		// as the effective timestep value or an operator value
+		enum Formatting {
 			Min,
 			Max,
 			Effective,
+			Operator,
 			None,
 		};
 
@@ -59,9 +60,6 @@ class Postraitement_DT : public Postraitement {
 		void postraiter(int) override;
 
 	private:
-
-		// method that return formatter for output depending of the extrema
-		std::string get_formatter(const Extrema& extrema) const;
 
 		// method that apply formatting
 		std::string format(const std::string input, const std::string formatter) const;
@@ -79,14 +77,24 @@ class Postraitement_DT : public Postraitement {
 	private:
 		
 		// text formatting (in number of characters)
-		int column_width       = 13;
-		int column_gap         = 3;
+		int column_width       = 14;
+		int column_gap         = 1;
 
 		// number of decimal number if floating points values
 		int number_of_decimals = 7;
 
 		// flag to activate or not formatting
 		int formatting_flag    = 1; // by default formatting is active
+
+		// formatting strings
+		static constexpr const char* formatter_minimum   = "\033[31;1m"; // red bold
+		static constexpr const char* formatter_maximum   = "\033[32;1m"; // green bold
+		static constexpr const char* formatter_effective = "\033[33;1m"; // yellow bold
+		static constexpr const char* formatter_operator  = "\033[2m";    // faint 
+		static constexpr const char* formatter_reset     = "\033[0m";
+
+		// columns separator
+		static constexpr const char* separator = "| ";
 };
 
 #endif
