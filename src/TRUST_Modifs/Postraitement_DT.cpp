@@ -240,11 +240,11 @@ void Postraitement_DT::postraiter(int)
       double current_time = time_scheme.temps_courant();
       file << write_float_column(current_time);
 
-		// Get the current computation time and compare with the previous one to get
-		// the computation duration for this timestep
-  		double duration = Statistiques::get_time_now();
-		file << write_float_column(duration - previous_duration);
-		previous_duration = duration;
+      // Get the current computation time and compare with the previous one to get
+      // the computation duration for this timestep
+      double duration = Statistiques::get_time_now();
+      file << write_float_column(duration - previous_duration);
+      previous_duration = duration;
 
       // Write all time steps
       for (size_t index_equation = 0;
