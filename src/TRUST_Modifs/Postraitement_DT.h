@@ -95,6 +95,9 @@ class Postraitement_DT : public Postraitement {
 
 		// columns separator
 		static constexpr const char* separator = "| ";
+
+		// the previous time (~timestamp) the postraiter method was called
+		double previous_duration = 0;
 };
 
 #endif
