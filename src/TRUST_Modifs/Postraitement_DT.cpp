@@ -19,6 +19,7 @@
 #include <Postraitement_DT.h>
 #include <SFichier.h>
 #include <Operateur.h>
+#include <Statistiques.h>
 
 Implemente_instanciable(Postraitement_DT, "Postraitement_DT", Postraitement);
 
@@ -92,8 +93,8 @@ Entree& Postraitement_DT::readOn(Entree& is)
   if (formatting_flag)
     file << "\033[1m"; // bold
 
-  //write_text_column(buffer, buffer_size, "Time");
   file << write_text_column("Time");
+  file << write_text_column("Duration");
 
   for (int index_equation = 0;
        index_equation < problem.nombre_d_equations(); index_equation++)
@@ -239,6 +240,11 @@ void Postraitement_DT::postraiter(int)
       double current_time = time_scheme.temps_courant();
       file << write_float_column(current_time);
 
+		// Get the current computation time and compare with the previous one to get
+		// the computation duration for this timestep
+  		double duration = Statistiques::get_time_now();
+		file << write_float_column(duration - previous_duration);
+		previous_duration = duration;
 
       // Write all time steps
       for (size_t index_equation = 0;

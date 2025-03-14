@@ -97,6 +97,9 @@ private:
 
   // columns separator
   static constexpr const char* separator = "| ";
+
+  // the previous time (~timestamp) the postraiter method was called
+  double previous_duration = 0;
 };
 
 #endif
