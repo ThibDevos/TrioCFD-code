@@ -378,9 +378,16 @@ private:
   double minx = -123., maxx = -123., pente = -123.;
   int is_repulsion = 0;
 
+  void calcul_force_solide_paroi(IntLists const& table_Verlet_bord, int ind_compo_i, int compo_i, IntList const& compo_sommets_i,
+                                 Maillage_FT_Disc const& maillage, DoubleTab const& positions_bords, DoubleTab const& vitesses,
+                                 double rayon_compo, double volume_compo, DoubleTab& F_now, DoubleTab& F_old, int nb_compo_tot, DoubleVect& collision_detected,
+                                 double rho_solide, double mu_fluide, Modele_Collision_FT& modele_collision_particule, double masse_eff,
+                                 double ed, DoubleTab& forces_solide, IntTab& Collision);
   void calculer_champ_forces_collisions(const DoubleTab& indicatrice, DoubleTab& valeurs_champ,  const Transport_Interfaces_FT_Disc& eq_transport,Transport_Interfaces_FT_Disc& eq_transport_non_const, OBS_PTR(Transport_Interfaces_FT_Disc)& refeq_transport, const Maillage_FT_Disc& maillage); // HMS
   void calculer_correction_trainee(DoubleTab& valeurs_champ, const Transport_Interfaces_FT_Disc& eq_transport,Transport_Interfaces_FT_Disc& eq_transport_non_const, OBS_PTR(Transport_Interfaces_FT_Disc)& refeq_transport, const Maillage_FT_Disc& maillage);// EB
   void init_positions_vitesses_FT();
+
+  void decouverte_du_code(Maillage_FT_Disc const&, OBS_PTR(Transport_Interfaces_FT_Disc)& );
 
 };
 

@@ -1903,6 +1903,10 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
   ArrOfInt elem_cg;
   domaine_vf.domaine().chercher_elements_FT(positions, elem_cg);
 
+  //TD
+  IntLists compo_sommets;
+  connec_compo_sommets(maillage, compo_sommets); //compo_sommet[i] contient les indices des sommets composant la compo i
+
   /***********************************************/
   // ETAPE 0 : Correspondance num eulerien au temps precedent et mauvais num lagrangien actuel
   /***********************************************/
@@ -2177,7 +2181,10 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
             }
           rayon_eff = rayon_compo;  // a modifier dans un cas bidisperse ou particules de tailles differentes
           masse_eff = masse_compo;
-
+          // calcul_force_solide_paroi(table_Verlet_bord, ind_compo_i, compo_i, compo_sommets[ind_compo_i],
+          //                           maillage, positions_bords,  vitesses, rayon_compo, volume_compo,  F_now,  F_old, nb_compo_tot,
+          //                           collision_detected, rho_solide,  mu_fluide,  modele_collision_particule,  masse_eff,
+          //                           ed,  forces_solide,  Collision);
           // Deuxieme boucle : Collision Particule-Paroi
           for (int ind_bord=0; ind_bord < (table_Verlet_bord[ind_compo_i].size()); ind_bord++)
             {
@@ -2579,6 +2586,103 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
   Cerr << "FIN Navier_Stokes_FT_Disc::calculer_champ_forces_collisions" << finl;
 
   statistiques().end_count(count);
+}
+
+
+//TD
+void Navier_Stokes_FT_Disc::calcul_force_solide_paroi(IntLists const& table_Verlet_bord, int ind_compo_i, int compo_i, IntList const& compo_sommets_i,
+                                                      Maillage_FT_Disc const& maillage, DoubleTab const& positions_bords, DoubleTab const& vitesses,
+                                                      double rayon_compo, double volume_compo, DoubleTab& F_now, DoubleTab& F_old, int nb_compo_tot, DoubleVect& collision_detected,
+                                                      double rho_solide, double mu_fluide,  Modele_Collision_FT& modele_collision_particule, double masse_eff,
+                                                      double ed, DoubleTab& forces_solide, IntTab& Collision)
+{
+  static const double seuil=1e-10; //XXX Defini dans calculer_champ_forces_collisions
+  double dt = schema_temps().pas_de_temps();
+  const DoubleTab& sommets = maillage.sommets();
+  DoubleTab dX(dimension);
+  DoubleTab dU(dimension);
+  double dX_min = std::numeric_limits<double>::max();
+  for (int ind_bord=0; ind_bord < (table_Verlet_bord[ind_compo_i].size()); ind_bord++)
+    {
+      int bord = table_Verlet_bord[ind_compo_i][ind_bord];
+      dX = 0.;
+      int ori = bord < dimension ? bord : bord - dimension;
+      for(int i_som = 0; i_som < compo_sommets_i.size(); ++i_som) //recherche le sommet le plus proche du mur
+        {
+          dX(ori) = sommets(compo_sommets_i[i_som],ori) - positions_bords(compo_i,bord);
+          dX_min = dX(ori) < dX_min ? dX(ori) : dX_min;
+        }
+      dX(ori) = dX_min;
+
+      for (int d = 0; d < dimension; d++) dU(d) = vitesses(compo_i, d); // XXX à modifier pour du non sphérique
+      double dist_cg = sqrt(local_carre_norme_vect(dX)); //distance entre le sommet le plus proche de la paroi et la paroi
+      double dist_int = dist_cg - rayon_compo; //XXX fonctionne pour du spherique car la paroi est vue comme une particule de rayon rayon_compo
+
+      F_now(compo_i,nb_compo_tot+bord) = 0;
+      if(dist_int <= 0) //contact
+        {
+          //<editor-fold desc="Calcule de la norme et de la vitesse relative normale">
+          DoubleTab norm(dimension);
+          for (int d = 0; d < dimension; d++) norm(d) = dX(d) / dist_cg; //La normale correspond à la normale à la paroi
+
+          //vitesse relative normale : dUn = (dU . dX / ||dX||) * norm
+          DoubleTab dUn(dimension);
+          double prod_sacl = local_prodscal(dX,dU) / dist_cg;
+          for (int d = 0; d < dimension; d++) dUn(d) = prod_sacl  * norm(d);
+          double vitesseRelNorm =sqrt(local_carre_norme_vect(dUn));
+
+
+          /*XXX A comprendre avant de modifier
+          //<editor-fold desc="Modele de lubrification">
+          // Calcul des forces de lubrifications
+          double d_int = fabs(dist_int) / rayon_compo; // a modifier dans un cas bidisperse ou particules de tailles differentes
+
+          if (isModeleLubrification && d_int <= d_act)
+          {
+            double lambda = 1 / d_int - log(d_int) / 5 - d_int * log(d_int) / 21;
+            double lambda_act = 1 / d_act - log(d_act) / 5 - d_act * log(d_act) / 21;
+            double lambda_sat = 1 / d_sat - log(d_sat) / 5 - d_sat * log(d_sat) / 21;
+            double delta_lambda = 0;
+            if (d_sat < d_int && d_int <= d_act)
+              delta_lambda = (lambda - lambda_act);
+
+            if (0 < d_int && d_int <= d_sat)
+              delta_lambda = (lambda_sat - lambda_act);
+
+            for (int d = 0; d < dimension; d++)
+            {
+              double force_lubrification = -6 * M_PI * mu_fluide * rayon_compo * dUn(d) * delta_lambda; // a modifier dans un cas bidisperse ou particules de tailles differentes
+              continue;
+              forces_solide(compo_i, d) += +force_lubrification / volume_compo;
+            }
+          }
+          */
+
+          // EB : Si dist_int <0 alors il faut appliquer la collision
+          collision_detected(compo_i) +=  0.1 ;
+          F_now(compo_i, nb_compo_tot+bord) = 1;
+          // EB : F_now et F_old : pour savoir dans quelle partie de la collision on est (pour le modele hybride)
+          int isFirstStepOfCollision = F_now(compo_i,nb_compo_tot+bord) > F_old(compo_i,nb_compo_tot+bord);
+          // EB : A l'endroit de la collision : le mur apparait comme une sphere de rayon rayon_compo(compo) (methode de HMS)
+          DoubleTab next_dX(dimension); // XXX à séparer en deux : déplacement normal + tangentiel
+          for (int d = 0; d < dimension; d++) next_dX(d) = dX(d) + dt * dU(d); //XXX idem
+          double next_dist_cg = sqrt(local_carre_norme_vect(next_dX)); //XXX idem
+          double next_dist_int = next_dist_cg -  rayon_compo; //XXX fonctionne pour du spherique car la paroi est vue comme une particule de rayon rayon_compo
+
+          double rayon_eff = rayon_compo;
+          double Stb = rho_solide * 2 * rayon_eff * vitesseRelNorm / (9 * mu_fluide); //XXX à revoir pour du non sphérique
+          DoubleTab force_contact(dimension);
+          int voisin = nb_compo_tot + bord;
+          modele_collision_particule.calculer_force_contact(force_contact, isFirstStepOfCollision, dist_int, next_dist_int, norm, dUn, masse_eff, compo_i, voisin, Stb, ed, vitesseRelNorm, dt, prod_sacl);
+          for (int d = 0; d < dimension; d++)
+            {
+              forces_solide(compo_i, d) +=  fabs(force_contact(d))<=seuil ? 0 : force_contact(d) / volume_compo; //XXX volume_compo à redefinir
+            }
+          Collision(compo_i,nb_compo_tot+bord)=1;
+        }
+      F_old(compo_i, nb_compo_tot+bord) = F_now(compo_i, nb_compo_tot+bord);
+      if (F_old(compo_i, nb_compo_tot+bord)>1) F_old(compo_i, nb_compo_tot+bord) =1;
+    }
 }
 
 // EB
@@ -6389,7 +6493,7 @@ DoubleTab& Navier_Stokes_FT_Disc::derivee_en_temps_inco(DoubleTab& vpoint)
 
         Cerr << "Do not compute calculer_champ_forces_superficielles" << finl;
         //calculer_champ_forces_superficielles(maillage, gradient_i, variables_internes().potentiel_elements, variables_internes().potentiel_faces, variables_internes().terme_source_interfaces);
-
+        if (is_solid_particle) decouverte_du_code(maillage,refeq_transport);
         if (is_solid_particle) calculer_champ_forces_collisions(indicatrice.valeurs(), terme_source_collisions, eq_transport, eq_transport_non_const, refeq_transport, maillage); //HMS
         if (flag_correction_trainee) calculer_correction_trainee(terme_correction_trainee, eq_transport, eq_transport_non_const, refeq_transport, maillage);
       }
@@ -8528,6 +8632,66 @@ void Navier_Stokes_FT_Disc::compute_num_compo(DoubleTab& num_compo,const DoubleT
 
 }
 
+
+void Navier_Stokes_FT_Disc::decouverte_du_code(Maillage_FT_Disc const& M, OBS_PTR(Transport_Interfaces_FT_Disc)& refeq_transport)
+{
+  ofstream f;
+  f.open("decouverte_du_code.txt");
+
+  const DoubleTab& sommets = M.sommets();
+  const IntTab& facettes= M.facettes();
+
+  //Sommets
+  f<<sommets.dimension(0)<<endl;
+  for(int i = 0; i<sommets.dimension(0); ++i) //boucle sur tous les sommets du maillage lagrangien
+    {
+      f<<sommets(i,0)<<" "<<sommets(i,1)<<" "<<sommets(i,2)<<std::endl;
+    }
+  f<<endl;
+
+
+
+
+  //Facettes
+  const int& nb_fa7 = M.nb_facettes();
+  f<<"nb facettes "<<nb_fa7<<endl;
+
+  //Facettes et sommets par particules
+  ArrOfInt compo_connexes_fa7(nb_fa7); //compo_connexes_fa7(fa7) donne l'indice de la compo (particule) contenant la facette fa7
+  int n = search_connex_components_local_FT(M, compo_connexes_fa7);
+  int nb_compo_tot=compute_global_connex_components_FT(M, compo_connexes_fa7, n);
+
+
+  IntLists connec_compo_fa7; //connec_compo_fa7[i] contient les indices des facettes composant la compo i
+  connec_compo_fa7.dimensionner(nb_compo_tot);
+  IntLists connec_compo_sommets; //connec_compo_sommet[i] contient les indices des sommets composant la compo i
+  connec_compo_sommets.dimensionner(nb_compo_tot);
+  IntList a = connec_compo_sommets[0];
+  for(int fa7 = 0; fa7 < nb_fa7; ++fa7)
+    {
+      if (!M.facette_virtuelle(fa7))
+        {
+          connec_compo_fa7[compo_connexes_fa7(fa7)].add(fa7);
+          connec_compo_sommets[compo_connexes_fa7(fa7)].add_if_not(facettes(fa7,0));
+          connec_compo_sommets[compo_connexes_fa7(fa7)].add_if_not(facettes(fa7,1));
+          connec_compo_sommets[compo_connexes_fa7(fa7)].add_if_not(facettes(fa7,2));
+        }
+    }
+  f<<endl;
+  f<<endl;
+  f<<connec_compo_fa7[0].size()<<endl;
+  f<<connec_compo_fa7[1].size()<<endl;
+
+  for(int i = 0; i<nb_compo_tot; ++i)
+    {
+      f<<"Particule "<<i<<" contient "<<connec_compo_sommets[i].size()<<" sommets"<<endl;
+      for(int j = 0; j<connec_compo_sommets[i].size(); ++j)
+        {
+          f<<sommets(connec_compo_sommets[i][j],0)<<" "<<sommets(connec_compo_sommets[i][j],1)<<" "<<sommets(connec_compo_sommets[i][j],2)<<endl;
+        }
+    }
+  f.close();
+}
 /*
  void Navier_Stokes_FT_Disc::corriger_mpoint()
  {

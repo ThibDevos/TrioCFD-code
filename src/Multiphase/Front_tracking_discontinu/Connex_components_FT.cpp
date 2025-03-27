@@ -248,3 +248,26 @@ int compute_global_connex_components_FT(const Maillage_FT_Disc& mesh, ArrOfInt& 
   return nb_components;
 }
 
+void connec_compo_sommets(Maillage_FT_Disc const& maillage, IntLists& compo_sommets)
+{
+  const IntTab& facettes= maillage.facettes();
+  const int& nb_fa7 = maillage.nb_facettes();
+
+  ArrOfInt compo_connexes_fa7(nb_fa7); //compo_connexes_fa7(fa7) donne l'indice de la compo (particule) contenant la facette fa7
+  int n = search_connex_components_local_FT(maillage, compo_connexes_fa7);
+  int nb_compo_tot=compute_global_connex_components_FT(maillage, compo_connexes_fa7, n);
+  IntLists connec_compo_fa7; //compo_fa7[i] contient les indices des facettes composant la compo i
+  connec_compo_fa7.dimensionner(nb_compo_tot);
+
+  compo_sommets.dimensionner(nb_compo_tot); //compo_sommet[i] contient les indices des sommets composant la compo i
+  for(int fa7 = 0; fa7 < nb_fa7; ++fa7)
+    {
+      if (!maillage.facette_virtuelle(fa7))
+        {
+          connec_compo_fa7[compo_connexes_fa7(fa7)].add(fa7);
+          compo_sommets[compo_connexes_fa7(fa7)].add_if_not(facettes(fa7,0));
+          compo_sommets[compo_connexes_fa7(fa7)].add_if_not(facettes(fa7,1));
+          compo_sommets[compo_connexes_fa7(fa7)].add_if_not(facettes(fa7,2));
+        }
+    }
+}

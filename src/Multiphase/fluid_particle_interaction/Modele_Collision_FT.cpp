@@ -447,7 +447,7 @@ void Modele_Collision_FT::calculer_positions_bords(const DoubleVect& rayon_parti
           break;
         }
 
-      // les bords sont traites comme des particules fictives placer en dehors du domaine, en mirroir.
+      // les bords sont traites comme des particules fictives placer en dehors du domaine, en mirroir. // XXX fonctionne toujours pour des particules non sphériques ???
       positions_bords_(compo,0) = Origine_modele_collision(0) - rayon_particule(compo) + valeurs_decalage(0);
       positions_bords_(compo,1) = Origine_modele_collision(1) - rayon_particule(compo) + valeurs_decalage(1);
       positions_bords_(compo,2) = Origine_modele_collision(2) - rayon_particule(compo) + valeurs_decalage(2);
