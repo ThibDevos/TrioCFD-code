@@ -271,3 +271,20 @@ void connec_compo_sommets(Maillage_FT_Disc const& maillage, IntLists& compo_somm
         }
     }
 }
+
+
+void connec_sommets_fa7(Maillage_FT_Disc const& maillage, IntLists& sommets_fa7)
+{
+  const IntTab& facettes= maillage.facettes();
+  const DoubleTab& sommets= maillage.sommets();
+  const int& nb_fa7 = maillage.nb_facettes();
+
+  sommets_fa7.dimensionner(sommets.dimension(0)); //sommets[i] contient les indices des fa7 incidement au sommet i
+  for(int fa7 = 0; fa7 < nb_fa7; ++fa7)
+    {
+      for(int i = 0; i<3; i++)
+      {
+        sommets_fa7[facettes(fa7,i)].add(fa7);
+      }
+    }
+}
