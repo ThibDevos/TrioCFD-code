@@ -1907,9 +1907,10 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
   domaine_vf.domaine().chercher_elements_FT(positions, elem_cg);
 
   //TD
-  IntLists compo_sommets;
-  connec_compo_sommets(maillage, compo_sommets); //compo_sommet[i] contient les indices des sommets composant la compo i
-
+  IntLists compo_sommets; //compo_sommet[i] contient les indices des sommets composant la compo i
+  IntLists sommets_fa7; //sommets[i] contient les indices des fa7 incidement au sommet i
+  connec_compo_sommets(maillage, compo_sommets);
+  connec_sommets_fa7(maillage, sommets_fa7);
   /***********************************************/
   // ETAPE 0 : Correspondance num eulerien au temps precedent et mauvais num lagrangien actuel
   /***********************************************/
@@ -2184,15 +2185,13 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
             }
           rayon_eff = rayon_compo;  // a modifier dans un cas bidisperse ou particules de tailles differentes
           masse_eff = masse_compo;
-          calcul_force_solide_paroi(table_Verlet_bord, ind_compo_i, compo_i, compo_sommets[ind_compo_i],
+          calcul_force_solide_paroi(table_Verlet_bord, ind_compo_i, compo_i, compo_sommets[ind_compo_i], sommets_fa7,
                                     maillage, positions_bords, positions, vitesses, rayon_compo, volume_compo,  F_now,  F_old, nb_compo_tot,
                                     collision_detected, rho_solide,  mu_fluide,  modele_collision_particule,  masse_eff,
                                     ed,  forces_solide,  Collision);
           // Deuxieme boucle : Collision Particule-Paroi
-          // ofstream f;
           // for (int ind_bord=0; ind_bord < (table_Verlet_bord[ind_compo_i].size()); ind_bord++)
           //   {
-          //     f.open("debug_old_raf.txt",std::ios::app);
           //     int bord = table_Verlet_bord[ind_compo_i][ind_bord];
           //     dU=0;
           //     dX=0;
@@ -2262,7 +2261,6 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
           //           }
 
           //         Collision(compo_i,nb_compo_tot+bord)=1;
-          //         f<<schema_temps().temps_courant()<<" "<<0<<" "<<dX(0)<<" "<<dX(1)<<" "<<dX(2)<<" "<<dist_int<<" "<<forces_solide(compo_i,0)<<" "<<forces_solide(compo_i,1)<<" "<<forces_solide(compo_i,2)<<endl;
 
           //       }
           //     F_old(compo_i, nb_compo_tot+bord) = F_now(compo_i, nb_compo_tot+bord);
@@ -2597,7 +2595,7 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
 
 
 //TD
-void Navier_Stokes_FT_Disc::calcul_force_solide_paroi(IntLists const& table_Verlet_bord, int ind_compo_i, int compo_i, IntList const& compo_sommets_i,
+void Navier_Stokes_FT_Disc::calcul_force_solide_paroi(IntLists const& table_Verlet_bord, int ind_compo_i, int compo_i, IntList const& compo_sommets_i, IntLists const& sommets_fa7,
                                                       Maillage_FT_Disc const& maillage, DoubleTab const& positions_bords, DoubleTab const& positions, DoubleTab const& vitesses,
                                                       double rayon_compo, double volume_compo, DoubleTab& F_now, DoubleTab& F_old, int nb_compo_tot, DoubleVect& collision_detected,
                                                       double rho_solide, double mu_fluide,  Modele_Collision_FT& modele_collision_particule, double masse_eff,
@@ -2611,33 +2609,109 @@ void Navier_Stokes_FT_Disc::calcul_force_solide_paroi(IntLists const& table_Verl
 
   ofstream f;
   ofstream g;
+  double ecart_moyen = 0;
+  for(int i = 0; i<sommets.dimension(0); ++i) //boucle sur tous les sommets du maillage lagrangien
+    {
+      dX(0) = sommets(i,0) - positions(0,0);
+      dX(1) = sommets(i,1) - positions(0,1);
+      dX(2) = sommets(i,2) - positions(0,2);
+      double ecart = 1.5e-3 - sqrt(local_carre_norme_vect(dX));
+      ecart_moyen += std::fabs(ecart);
+    }
+  f.open("vitesse_moyenne.txt",std::ios::app);
+  f<<schema_temps().temps_courant()<<" "<<dt *vitesses(compo_i, 0)<<" "<<dt *vitesses(compo_i, 1)<<" "<<dt *vitesses(compo_i, 2)<<endl;
+  f.close();
+  for (int d = 0; d < dimension; d++) dU(d) = vitesses(compo_i, d); // XXX à modifier pour du non sphérique
+  f.open("ecart_moyen.txt",std::ios::app);
+  f<<schema_temps().temps_courant()<<" "<<sqrt(local_carre_norme_vect(dU))<<" "<<ecart_moyen/sommets.dimension(0)<<endl;
+  f.close();
+  g.open("position_explicit_mid_cg.txt",std::ios::app);
   for (int ind_bord=0; ind_bord < (table_Verlet_bord[ind_compo_i].size()); ind_bord++)
     {
       double dX_min = std::numeric_limits<double>::max();
-      f.open("debug_no_rem.txt",std::ios::app);
-      g.open("debug_new_dist.txt",std::ios::app);
+      f.open("debug_new_fa7.txt",std::ios::app);
       int bord = table_Verlet_bord[ind_compo_i][ind_bord];
       dX = 0.;
       int ori = bord < dimension ? bord : bord - dimension;
+
+      DoubleTab xx(dimension);
+      DoubleTab x_debug(dimension);
+      /*-------------------------------------------------------------------*/
+      /*---------------------sommet le plus proche-------------------------*/
+      /*-------------------------------------------------------------------*/
       int i_som_closest=-1;
       for(int i_som = 0; i_som < compo_sommets_i.size(); ++i_som) //recherche le sommet le plus proche du mur
         {
+          for(int d = 0; d<dimension; ++d)
+            {
+              x_debug(d) = sommets(compo_sommets_i[i_som],ori);
+            }
           dX(ori) = sommets(compo_sommets_i[i_som],ori) - positions_bords(compo_i,bord);
           if(dX(ori) < dX_min ) i_som_closest = i_som;
           dX_min = dX(ori) <= dX_min ? dX(ori) : dX_min;
         }
+
+      int globabl_som_closest = compo_sommets_i[i_som_closest];
+      DoubleTab const& cg_fa7 = maillage.cg_fa7();
+      dX = 0.;
+      dX_min = std::numeric_limits<double>::max();
+      // int f_closest = -1;
+      double alpha = 1.;
+      // double alpha = 0.99872;
+      for(int fi = 0; fi<sommets_fa7[i_som_closest].size(); ++fi)
+        {
+          int fa7 = sommets_fa7[i_som_closest][fi];
+          for(int d=0; d<dimension; ++d) {xx(d) = (sommets(globabl_som_closest,d) * alpha + (1-alpha) * cg_fa7(fa7,d) ) ; } //xx : point au milieu du sommet et du centre de la facette
+          dX(ori) = xx(ori) - positions_bords(compo_i,bord);
+          // if(dX(ori) < dX_min ) f_closest = fa7;
+          dX_min = dX(ori) < dX_min ? dX(ori) : dX_min;
+        }
       dX(ori) = dX_min;
 
+
       DoubleTab som_cg(dimension);
-      for(int d = 0 ; d < dimension; ++d) {som_cg(d) = sommets(compo_sommets_i[i_som_closest],d) - positions(compo_i,d);}
-      double dist_som_cg = sqrt(local_carre_norme_vect(som_cg));
+      for(int d = 0 ; d < dimension; ++d) {som_cg(d) = xx(d) - positions(compo_i,d);}
+
+      // double dist_som_cg = sqrt(local_carre_norme_vect(som_cg));
+
+
+      /*-------------------------------------------------------------------*/
+      /*---------------------facette la plus proche------------------------*/
+      /*-------------------------------------------------------------------*/
+      // IntTab const& facettes = maillage.facettes();
+      // DoubleTab const& cg_fa7 = maillage.cg_fa7();
+      // int f_closest = -1;
+      // for(int fa = 0; fa<facettes.dimension(0); ++fa)
+      //   {
+      //     dX(ori) = cg_fa7(fa,ori) - positions_bords(compo_i,bord);
+      //     if(dX(ori) < dX_min )
+      //       {
+      //         f_closest = fa;
+      //         dX_min = dX(ori);
+      //       }
+      //   }
+
+      // dX_min = std::numeric_limits<double>::max();
+      // dX = 0.;
+      // for(int i = 0; i<3; ++i) //loop over the vertices of the fa7 (contains 3 vertices)
+      //   {
+      //     for(int d = 0; d<dimension; ++d)
+      //       {
+      //         xx(d) = (sommets(facettes(f_closest,i),d) + cg_fa7(f_closest,d))/2;
+      //       }
+      //     dX(ori) = xx(ori) - positions_bords(compo_i,bord);
+      //     dX_min = dX(ori) <= dX_min ? dX(ori) : dX_min;
+      //   }
+      // dX(ori) = dX_min;
+
+
       // dX(0) = dX_min - (rayon_compo - som_cg(0));// XXX correction
       // dX(ori) = dX_min - (rayon_compo - std::fabs(som_cg(ori)));// XXX correction
       // dX(2) = dX_min - (rayon_compo - som_cg(2));// XXX correction
 
-      for (int d = 0; d < dimension; d++) dU(d) = vitesses(compo_i, d); // XXX à modifier pour du non sphérique
+
       double dist_cg = sqrt(local_carre_norme_vect(dX)); //distance entre le sommet le plus proche de la paroi et la paroi
-      double dist_int = dist_cg - rayon_compo; //XXX fonctionne pour du spherique car la paroi est vue comme une particule de rayon rayon_compo
+      double dist_int = dist_cg - modele_collision_particule.get_valeurs_decalage()(bord) ; //XXX fonctionne pour du spherique car la paroi est vue comme une particule de rayon rayon_compo
 
       F_now(compo_i,nb_compo_tot+bord) = 0;
       if(dist_int <= 0) //contact
@@ -2688,28 +2762,28 @@ void Navier_Stokes_FT_Disc::calcul_force_solide_paroi(IntLists const& table_Verl
           DoubleTab next_dX(dimension); // XXX à séparer en deux : déplacement normal + tangentiel
           for (int d = 0; d < dimension; d++) next_dX(d) = dX(d) + dt * dU(d); //XXX idem
           double next_dist_cg = sqrt(local_carre_norme_vect(next_dX)); //XXX idem
-          double next_dist_int = next_dist_cg -  rayon_compo; //XXX fonctionne pour du spherique car la paroi est vue comme une particule de rayon rayon_compo
+          double next_dist_int = next_dist_cg -  modele_collision_particule.get_valeurs_decalage()(bord) ; //XXX fonctionne pour du spherique car la paroi est vue comme une particule de rayon rayon_compo
 
           double rayon_eff = rayon_compo;
           double Stb = rho_solide * 2 * rayon_eff * vitesseRelNorm / (9 * mu_fluide); //XXX à revoir pour du non sphérique
           DoubleTab force_contact(dimension);
           int voisin = nb_compo_tot + bord;
-          modele_collision_particule.calculer_force_contact(force_contact, isFirstStepOfCollision, dist_int, next_dist_int, norm, dUn, masse_eff, compo_i, voisin, Stb, ed, vitesseRelNorm, dt, prod_sacl);
+          modele_collision_particule.calculer_force_contact(force_contact, isFirstStepOfCollision, dist_int, dist_int, norm, dUn, masse_eff, compo_i, voisin, Stb, ed, vitesseRelNorm, dt, prod_sacl);
           for (int d = 0; d < dimension; d++)
             {
               forces_solide(compo_i, d) +=  fabs(force_contact(d))<=seuil ? 0 : force_contact(d) / volume_compo; //XXX volume_compo à redefinir
             }
           Collision(compo_i,nb_compo_tot+bord)=1;
-          f<<schema_temps().temps_courant()<<" "<<i_som_closest<<" "<<dX(0)<<" "<<dX(1)<<" "<<dX(2)<<" "<<dist_int<<" "<<forces_solide(compo_i,0)<<" "<<forces_solide(compo_i,1)<<" "<<forces_solide(compo_i,2)<<endl;
-          g<<dist_som_cg<<" "<<rayon_compo - dist_som_cg<<endl;
-          g<<som_cg(0)<<" "<<som_cg(1)<<" "<<som_cg(2)<<endl;
+          f<<schema_temps().temps_courant()<<" "<<i_som_closest<<" "<<dX(0)<<" "<<dX(1)<<" "<<dX(2)<<" "<<dist_int<<" "<<next_dist_int<<" "<<forces_solide(compo_i,0)<<" "<<forces_solide(compo_i,1)<<" "<<forces_solide(compo_i,2)<<endl;
+          // g<<xx(0)<<" "<<xx(1)<<" "<<xx(2)<<endl;
         }
 
       F_old(compo_i, nb_compo_tot+bord) = F_now(compo_i, nb_compo_tot+bord);
       if (F_old(compo_i, nb_compo_tot+bord)>1) F_old(compo_i, nb_compo_tot+bord) =1;
       f.close();
-      g.close();
     }
+  g<<schema_temps().temps_courant()<<" "<<positions(compo_i,0)<<" "<<positions(compo_i,1)<<" "<<positions(compo_i,2)<<" "<<positions(compo_i,0)+ dt * dU(0)<<" "<<positions(compo_i,1)+ dt * dU(1)<<" "<<positions(compo_i,2)+ dt * dU(2)<<endl;
+  g.close();
 }
 
 // EB
@@ -8669,7 +8743,7 @@ void Navier_Stokes_FT_Disc::decouverte_du_code(Maillage_FT_Disc const& M, OBS_PT
   ofstream f;
   ofstream g;
   f.open("decouverte_du_code.txt");
-  g.open("ecart_moyen_NM.txt",std::ios::app);
+  g.open("ecart_moyen_sg.txt",std::ios::app);
 
   const DoubleTab& sommets = M.sommets();
   const IntTab& facettes= M.facettes();

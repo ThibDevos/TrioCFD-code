@@ -378,7 +378,7 @@ private:
   double minx = -123., maxx = -123., pente = -123.;
   int is_repulsion = 0;
 
-  void calcul_force_solide_paroi(IntLists const& table_Verlet_bord, int ind_compo_i, int compo_i, IntList const& compo_sommets_i,
+  void calcul_force_solide_paroi(IntLists const& table_Verlet_bord, int ind_compo_i, int compo_i, IntList const& compo_sommets_i, IntLists const& sommets_fa7,
                                  Maillage_FT_Disc const& maillage, DoubleTab const& positions_bords, DoubleTab const& positions, DoubleTab const& vitesses,
                                  double rayon_compo, double volume_compo, DoubleTab& F_now, DoubleTab& F_old, int nb_compo_tot, DoubleVect& collision_detected,
                                  double rho_solide, double mu_fluide, Modele_Collision_FT& modele_collision_particule, double masse_eff,
