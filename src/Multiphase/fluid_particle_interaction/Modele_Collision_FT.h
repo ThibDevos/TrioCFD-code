@@ -74,6 +74,7 @@ public:
   DoubleTab& get_F_old();
   DoubleTab& get_F_now();
   DoubleTab& get_forces_solide();
+  const DoubleTab& get_forces_solide() const;
 
   DoubleVect& get_collisions_detected();
 
@@ -100,6 +101,8 @@ public:
   void set_nom_fichier_reprise_FT(Nom fichier_reprise_FT);
   void set_d_act_lub(double d_act_lub);
   void set_d_sat_lub(double d_sat_lub);
+
+  DoubleVect& get_valeurs_decalage() {return valeurs_decalage;}
 
 protected:
   double tau_coll_;

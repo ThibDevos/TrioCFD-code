@@ -448,12 +448,12 @@ void Modele_Collision_FT::calculer_positions_bords(const DoubleVect& rayon_parti
         }
 
       // les bords sont traites comme des particules fictives placer en dehors du domaine, en mirroir. // XXX fonctionne toujours pour des particules non sphériques ???
-      positions_bords_(compo,0) = Origine_modele_collision(0) - rayon_particule(compo) + valeurs_decalage(0);
-      positions_bords_(compo,1) = Origine_modele_collision(1) - rayon_particule(compo) + valeurs_decalage(1);
-      positions_bords_(compo,2) = Origine_modele_collision(2) - rayon_particule(compo) + valeurs_decalage(2);
-      positions_bords_(compo,3) = Origine_modele_collision(0) + Longueurs_modele_collision(0) + rayon_particule(compo) - valeurs_decalage(3);
-      positions_bords_(compo,4) = Origine_modele_collision(1) + Longueurs_modele_collision(1) + rayon_particule(compo) - valeurs_decalage(4);
-      positions_bords_(compo,5) = Origine_modele_collision(2) + Longueurs_modele_collision(2) + rayon_particule(compo) - valeurs_decalage(5);
+      positions_bords_(compo,0) = Origine_modele_collision(0) /*- rayon_particule(compo) + valeurs_decalage(0)*/;
+      positions_bords_(compo,1) = Origine_modele_collision(1) /*- rayon_particule(compo) + valeurs_decalage(1)*/;
+      positions_bords_(compo,2) = Origine_modele_collision(2) /*- rayon_particule(compo) + valeurs_decalage(2)*/;
+      positions_bords_(compo,3) = Origine_modele_collision(0) + Longueurs_modele_collision(0) /*+ rayon_particule(compo) - valeurs_decalage(3)*/;
+      positions_bords_(compo,4) = Origine_modele_collision(1) + Longueurs_modele_collision(1) /*+ rayon_particule(compo) - valeurs_decalage(4)*/;
+      positions_bords_(compo,5) = Origine_modele_collision(2) + Longueurs_modele_collision(2) /*+ rayon_particule(compo) - valeurs_decalage(5)*/;
     }
 }
 
@@ -594,6 +594,10 @@ DoubleTab& Modele_Collision_FT::get_F_now()
   return F_now_;
 }
 DoubleTab& Modele_Collision_FT::get_forces_solide()
+{
+  return forces_solide_;
+}
+const DoubleTab& Modele_Collision_FT::get_forces_solide() const
 {
   return forces_solide_;
 }
