@@ -378,6 +378,22 @@ private:
   double minx = -123., maxx = -123., pente = -123.;
   int is_repulsion = 0;
 
+  void deepest_points(IntLists const& compo_sommets, IntLists const& sommets_fa7, Maillage_FT_Disc const& maillage, int compo_i, int compo_j,
+                      DoubleTab const& positions, bool check_cg, DoubleTab& dX, int& i_closest, int& j_closest, bool& i_fa7, bool& j_fa7);
+
+  void closest_nodes(IntLists const& compo_sommets, Maillage_FT_Disc const& maillage, int compo_i, int compo_j,
+                     DoubleTab const& positions, DoubleTab& dX, int& i_closest, int& j_closest);
+
+  void normal_i(Maillage_FT_Disc const& maillage,IntLists const& sommets_fa7, bool i_fa7, int i_closest, DoubleTab& n);
+
+  void normal_average_ij(Maillage_FT_Disc const& maillage,IntLists const& sommets_fa7, bool i_fa7, int i_closest, bool j_fa7, int j_closest, DoubleTab& n);
+
+  void calcul_force_solide_solide(IntLists const& table_Verlet, int ind_compo_i, int compo_i, IntLists const& compo_sommets,IntLists const& sommets_fa7,
+                                  Maillage_FT_Disc const& maillage, DoubleTab const& positions, DoubleTab const& vitesses, double rayon_compo, double volume_compo, double masse_compo,
+                                  DoubleTab& F_now, DoubleTab& F_old, DoubleVect& collision_detected, double rho_solide, double mu_fluide,
+                                  Modele_Collision_FT& modele_collision_particule, double ed, DoubleTab& forces_solide,
+                                  IntTab& Collision);
+
   void calcul_force_solide_paroi(IntLists const& table_Verlet_bord, int ind_compo_i, int compo_i, IntList const& compo_sommets_i, IntLists const& sommets_fa7,
                                  Maillage_FT_Disc const& maillage, DoubleTab const& positions_bords, DoubleTab const& positions, DoubleTab const& vitesses,
                                  double rayon_compo, double volume_compo, DoubleTab& F_now, DoubleTab& F_old, int nb_compo_tot, DoubleVect& collision_detected,
