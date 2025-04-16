@@ -419,10 +419,10 @@ void  Modele_Collision_FT::calculer_force_contact(DoubleTab& force_contact, int&
 void Modele_Collision_FT::calculer_positions_bords(const DoubleVect& rayon_particule)
 {
 
-  int nb_compo_tot=rayon_particule.size();
-  positions_bords_.resize(nb_compo_tot,6);
+  // int nb_compo_tot=rayon_particule.size();
+  positions_bords_.resize(1,6);
   valeurs_decalage.resize(6);
-  for (int compo=0; compo<nb_compo_tot; compo++)
+  for (int compo=0; compo<1; compo++)
 
     {
       switch(decalage_bords_)
