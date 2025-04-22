@@ -1900,7 +1900,7 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
   int nb_compo_tot=positions.dimension(0);
 
   static const DoubleTab& positions_bords=modele_collision_particule.position_bords();
-  int nb_bords = positions_bords.dimension(1);
+  int nb_bords = positions_bords.dimension(0);
 
   assert(nb_compo_tot != 0);
   ArrOfInt elem_cg;
@@ -2029,7 +2029,7 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
                       for (int ind_bord=0; ind_bord<nb_bords; ind_bord++)
                         {
                           int ori = ind_bord < dimension ? ind_bord : ind_bord - dimension;
-                          double dij=fabs(positions_bords(0,ind_bord)-positions(compo_i,ori));
+                          double dij=fabs(positions_bords(ind_bord)-positions(compo_i,ori));
                           if ((dij-2*rayon_compo)<=s_Verlet) table_Verlet_bord[ind_compo_i].add(ind_bord);
                         }
                     }
@@ -2052,7 +2052,7 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
                       for (int ind_bord=0; ind_bord<nb_bords; ind_bord++)
                         {
                           int ori = ind_bord < dimension ? ind_bord : ind_bord - dimension;
-                          double dij=fabs(positions_bords(0,ind_bord)-positions(compo_i,ori));
+                          double dij=fabs(positions_bords(ind_bord)-positions(compo_i,ori));
                           if ((dij-2*rayon_compo)<=s_Verlet) table_Verlet_bord[compo_i].add(ind_bord);
                         }
                     }
@@ -2100,11 +2100,10 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
   if (modele_collision_particule.is_detection_Verlet()==1)
     {
       ofstream f;
-      f.open("positions_normal_ij_deepest_cg.txt",std::ios::app);
+      f.open("positions_old.txt",std::ios::app);
       f<<schema_temps().temps_courant()<<" ";
       for (int ind_compo_i=0; ind_compo_i< nb_compo_reelles; ind_compo_i++)
         {
-          std::cout<<"Compo "<<ind_compo_i<<endl;
           int compo_i=is_LC_on ? liste_composantes_reelles(ind_compo_i) : ind_compo_i;
           // Premiere boucle : Collision Particule-Particule uniquement
           // double rayon_eff = rayon_compo/2;  // a modifier dans un cas bidisperse ou particules de tailles differentes
@@ -2124,12 +2123,16 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
           //     double dist_cg = sqrt(local_carre_norme_vect(dX));
           //     double dist_int = dist_cg - 2 * rayon_compo;
           //     F_now(compo_i, compo_j) = 0;
+          //     DoubleTab norm(dimension);
+          //     for (int d = 0; d < dimension; d++) norm(d) = dX(d) / dist_cg;
+          //     ofstream g;
+          //     g.open("normal_old.txt",std::ios::app);
+          //     g<<schema_temps().temps_courant()<<" "<<norm(0)<<" "<<norm(1)<<" "<<norm(2)<<endl;
           //     //Cerr << "dist_int " << dist_int << finl;
           //     if (dist_int <= 0) // contact
           //       {
+          //         g<<"Contact"<<endl;
           //         //<editor-fold desc="Calcule de la norme et de la vitesse relative normale">
-          //         DoubleTab norm(dimension);
-          //         for (int d = 0; d < dimension; d++) norm(d) = dX(d) / dist_cg;
           //         double prod_sacl = local_prodscal(dX,dU);
           //         DoubleTab dUn(dimension);
           //         for (int d = 0; d < dimension; d++) dUn(d) = (prod_sacl / dist_cg) * norm(d);
@@ -2185,6 +2188,7 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
           //           }
           //         Collision(compo_i,compo_j)=1;
           //       }
+          //     g<<endl;
           //     F_old(compo_i, compo_j) = F_now(compo_i, compo_j);
           //   }
           calcul_force_solide_solide(table_Verlet, ind_compo_i, compo_i, compo_sommets,sommets_fa7,
@@ -2204,7 +2208,7 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
           //     dU=0;
           //     dX=0;
           //     int ori = bord < dimension ? bord : bord - dimension;
-          //     dX(ori) = positions(compo_i, ori) - positions_bords(compo_i,bord);
+          //     dX(ori) = positions(compo_i, ori) - positions_bords(bord);
 
           //     for (int d = 0; d < dimension; d++) dU(d) = vitesses(compo_i, d);
           //     double dist_cg = sqrt(local_carre_norme_vect(dX));
@@ -2321,7 +2325,7 @@ void Navier_Stokes_FT_Disc::calculer_champ_forces_collisions(const DoubleTab& in
                 {
                   int bord = voisin - nb_compo_tot;
                   int ori = bord < dimension ? bord : bord - dimension;
-                  dX(ori) = positions(compo, ori) - positions_bords(compo,bord);
+                  dX(ori) = positions(compo, ori) - positions_bords(bord);
                   for (int d = 0; d < dimension; d++) dU(d) = vitesses(compo, d);
                 }
               double dist_cg = sqrt(local_carre_norme_vect(dX));
@@ -2899,25 +2903,11 @@ void Navier_Stokes_FT_Disc::calcul_force_solide_solide(IntLists const& table_Ver
       normal_average_ij(maillage, sommets_fa7, i_fa7, i_closest, j_fa7, j_closest, n);
       double dist_int = sqrt(local_carre_norme_vect(dX));
       ofstream f;
-      f.open("normal_ij_deepest_cg.txt",std::ios::app);
+      f.open("normal_ij_deepest.txt",std::ios::app);
       f<<schema_temps().temps_courant()<<" "<<n(0)<<" "<<n(1)<<" "<<n(2)<<endl;
-      f<<dist_int<<endl;
 
       if (local_prodscal(dX,n) >= 0) // contact
         {
-
-          f<<"Projection"<<endl;
-          double ps = local_prodscal(dX,n);
-          for(int d = 0; d<dimension; ++d)
-            {
-              n(d) = ps * n(d);
-            }
-          double nn = sqrt(local_carre_norme_vect(n));
-          for(int d = 0; d<dimension; ++d)
-            {
-              n(d) /=nn;
-            }
-          f<<schema_temps().temps_courant()<<" "<<n(0)<<" "<<n(1)<<" "<<n(2)<<endl;
           f<<"Conctact"<<endl;
           //<editor-fold desc="Calcule de la norme et de la vitesse relative normale">
           DoubleTab norm(dimension);
@@ -3020,15 +3010,15 @@ void Navier_Stokes_FT_Disc::calcul_force_solide_paroi(IntLists const& table_Verl
       /*-------------------------------------------------------------------*/
       /*---------------------sommet le plus proche-------------------------*/
       /*-------------------------------------------------------------------*/
-      int i_som_closest=-1;
+      // int i_som_closest=-1;
       for(int i_som = 0; i_som < compo_sommets_i.size(); ++i_som) //recherche le sommet le plus proche du mur
         {
           for(int d = 0; d<dimension; ++d)
             {
               x_debug(d) = sommets(compo_sommets_i[i_som],ori);
             }
-          dX(ori) = std::fabs(sommets(compo_sommets_i[i_som],ori) - positions_bords(0,bord));
-          if(dX(ori) < dX_min ) i_som_closest = i_som;
+          dX(ori) = std::fabs(sommets(compo_sommets_i[i_som],ori) - positions_bords(bord));
+          // if(dX(ori) < dX_min ) i_som_closest = i_som;
           dX_min = dX(ori) <= dX_min ? dX(ori) : dX_min;
         }
 
@@ -3057,7 +3047,7 @@ void Navier_Stokes_FT_Disc::calcul_force_solide_paroi(IntLists const& table_Verl
 
 
       double dist_cg = sqrt(local_carre_norme_vect(dX)); //distance entre le sommet le plus proche de la paroi et la paroi
-      double dist_int = dist_cg-modele_collision_particule.get_valeurs_decalage()(bord); //XXX fonctionne pour du spherique car la paroi est vue comme une particule de rayon rayon_compo
+      double dist_int = dist_cg-modele_collision_particule.get_valeurs_decalage(); //XXX fonctionne pour du spherique car la paroi est vue comme une particule de rayon rayon_compo
       F_now(compo_i,nb_compo_tot+bord) = 0;
       if(dist_int <= 0) //contact
         {
@@ -3104,11 +3094,6 @@ void Navier_Stokes_FT_Disc::calcul_force_solide_paroi(IntLists const& table_Verl
           F_now(compo_i, nb_compo_tot+bord) = 1;
           // EB : F_now et F_old : pour savoir dans quelle partie de la collision on est (pour le modele hybride)
           int isFirstStepOfCollision = F_now(compo_i,nb_compo_tot+bord) > F_old(compo_i,nb_compo_tot+bord);
-          // EB : A l'endroit de la collision : le mur apparait comme une sphere de rayon rayon_compo(compo) (methode de HMS)
-          DoubleTab next_dX(dimension); // XXX à séparer en deux : déplacement normal + tangentiel
-          for (int d = 0; d < dimension; d++) next_dX(d) = dX(d) + dt * dU(d); //XXX idem
-          double next_dist_cg = sqrt(local_carre_norme_vect(next_dX)); //XXX idem
-          double next_dist_int = next_dist_cg -  modele_collision_particule.get_valeurs_decalage()(bord) ; //XXX fonctionne pour du spherique car la paroi est vue comme une particule de rayon rayon_compo
 
           double rayon_eff = rayon_compo;
           double Stb = rho_solide * 2 * rayon_eff * vitesseRelNorm / (9 * mu_fluide); //XXX à revoir pour du non sphérique

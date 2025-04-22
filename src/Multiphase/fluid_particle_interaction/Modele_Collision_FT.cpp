@@ -53,8 +53,7 @@ Modele_Collision_FT::Modele_Collision_FT() :
   valeurs_decalage(0),
   compteur_collisions_(0)
 {
-  positions_bords_.resize(0,6);
-  valeurs_decalage.resize(6);
+  positions_bords_.resize(6);
 }
 
 
@@ -420,8 +419,7 @@ void Modele_Collision_FT::calculer_positions_bords(const DoubleVect& rayon_parti
 {
 
   // int nb_compo_tot=rayon_particule.size();
-  positions_bords_.resize(1,6);
-  valeurs_decalage.resize(6);
+  positions_bords_.resize(6);
   for (int compo=0; compo<1; compo++)
 
     {

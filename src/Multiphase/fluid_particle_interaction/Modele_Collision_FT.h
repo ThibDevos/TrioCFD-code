@@ -102,7 +102,7 @@ public:
   void set_d_act_lub(double d_act_lub);
   void set_d_sat_lub(double d_sat_lub);
 
-  DoubleVect& get_valeurs_decalage() {return valeurs_decalage;}
+  double get_valeurs_decalage() {return valeurs_decalage;}
 
 protected:
   double tau_coll_;
@@ -137,7 +137,7 @@ protected:
   ArrOfIntFT liste_zone_inf_;
 
 
-  DoubleVect valeurs_decalage;
+  double valeurs_decalage;
   int compteur_collisions_;
 
   OBS_PTR(Transport_Interfaces_FT_Disc) refequation_transport_;
