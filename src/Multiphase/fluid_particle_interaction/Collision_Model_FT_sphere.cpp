@@ -39,8 +39,10 @@ Sortie& Collision_Model_FT_sphere::printOn(Sortie& os) const
 void Collision_Model_FT_sphere::compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                                                   const DoubleTab& particles_position,
                                                                   const DoubleTab& particles_velocity,
-                                                                  const double& deltat_simu)
+                                                                  const double& deltat_simu,
+                                                                  const Maillage_FT_Disc& mesh)
 {
+  static double t=0.;
   const int& id_fluid_phase= two_phase_fluid.get_id_fluid_phase();
   const int& id_solid_phase=1-id_fluid_phase;
   const auto& solid_particle=ref_cast(Solid_Particle_sphere,two_phase_fluid.fluide_phase(id_solid_phase));
@@ -105,7 +107,7 @@ void Collision_Model_FT_sphere::compute_lagrangian_contact_forces(const Fluide_D
               const double impact_Stokes = solid_density * 2 * effective_radius * impact_velocity /
                                            (9 * fluid_viscosity);
               if (is_start_of_collision)
-                e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes);
+                e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes)/compute_ewet_legendre(impact_Stokes);
               DoubleTab force_contact=compute_contact_force(
                                         next_dist_between_particles,
                                         norm,
@@ -114,6 +116,9 @@ void Collision_Model_FT_sphere::compute_lagrangian_contact_forces(const Fluide_D
                                         particle_j,
                                         dX_scal_dU<=0,
                                         is_particle_particle_collision);
+              ofstream g;
+              g.open("forces_sp.txt",std::ios::app);
+              g<<t<<" "<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
               for (int d = 0; d < dimension; d++)
                 {
                   lagrangian_contact_forces_(particle_i, d) += fabs(force_contact(d)) <=
@@ -123,6 +128,7 @@ void Collision_Model_FT_sphere::compute_lagrangian_contact_forces(const Fluide_D
                   lagrangian_contact_forces_(particle_j, d) -= fabs(force_contact(d)) <=
                                                                min_threshold ? 0 :  force_contact(d) / volume_sphere;
                 }
+              t+=deltat_simu;
             }
           F_old_(particle_i, particle_j) = F_now_(particle_i, particle_j);
         }

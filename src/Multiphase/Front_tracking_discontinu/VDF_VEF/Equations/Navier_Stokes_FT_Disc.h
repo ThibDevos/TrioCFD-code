@@ -22,6 +22,7 @@
 #include <type_traits>
 #include <TRUST_Ref.h>
 #include <Collision_Model_FT_base.h>
+#include <fstream> // XXX for debug
 
 class Probleme_FT_Disc_gen;
 class Maillage_FT_Disc;
@@ -126,6 +127,9 @@ protected:
 private:
   const Navier_Stokes_FT_Disc_interne& variables_internes() const;
   Navier_Stokes_FT_Disc_interne& variables_internes();
+
+  // XXX debug
+  Motcle fichier_debug;
 
   // Ne pas utiliser ce pointeur : utiliser variables_internes() a la place !
   Navier_Stokes_FT_Disc_interne variables_internes_;

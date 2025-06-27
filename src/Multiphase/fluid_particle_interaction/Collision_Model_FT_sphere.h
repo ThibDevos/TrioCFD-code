@@ -39,7 +39,8 @@ public:
   void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                          const DoubleTab& particles_position,
                                          const DoubleTab& particles_velocity,
-                                         const double& deltat_simu) override;
+                                         const double& deltat_simu,
+                                         const Maillage_FT_Disc& mesh) override;
 
   void discretize_contact_forces_eulerian_field(const DoubleTab& volumic_phase_indicator_function,
                                                 const Domaine_VF& domain_vf,

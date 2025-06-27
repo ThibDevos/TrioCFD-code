@@ -16,7 +16,7 @@
 #ifndef Connex_components_FT_H_INCLU
 #define Connex_components_FT_H_INCLU
 #include <arch.h>
-
+#include <TRUSTLists.h>
 #include <TRUSTTabs_forward.h>
 class Maillage_FT_Disc;
 
@@ -24,4 +24,6 @@ int search_connex_components_local_FT(const Maillage_FT_Disc& mesh, ArrOfInt& nu
                                       const int include_virtual=0);
 
 int compute_global_connex_components_FT(const Maillage_FT_Disc& mesh, ArrOfInt& num_compo, int nb_local_components);
+void connec_compo_sommets(Maillage_FT_Disc const&, IntLists&);
+void connec_sommets_fa7(Maillage_FT_Disc const& , IntLists& );
 #endif

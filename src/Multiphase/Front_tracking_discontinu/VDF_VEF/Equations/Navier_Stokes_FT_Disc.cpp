@@ -285,6 +285,7 @@ void Navier_Stokes_FT_Disc::set_param(Param& param)
   param.ajouter("correction_courbure_ordre", &variables_internes().correction_courbure_ordre_);
   param.ajouter_non_std("interpol_indic_pour_dI_dt", (this));
   param.ajouter_non_std("OutletCorrection_pour_dI_dt", (this));
+  param.ajouter_non_std("fichier_debug", (this)); // XXX debug file
 }
 
 int Navier_Stokes_FT_Disc::lire_motcle_non_standard(const Motcle& mot, Entree& is)
@@ -619,6 +620,11 @@ int Navier_Stokes_FT_Disc::lire_motcle_non_standard(const Motcle& mot, Entree& i
           Cerr << "Transport_Interfaces_FT_Disc::lire\n" << "The options for methode_transport are :\n" << motcles2;
           Process::exit();
         }
+    }
+  else if(mot == "fichier_debug")// XXX debug file
+    {
+      is >> fichier_debug;
+      std::transform(fichier_debug.getString().begin(), fichier_debug.getString().end(), fichier_debug.getString().begin(), ::tolower);
     }
   else
     return Navier_Stokes_Turbulent::lire_motcle_non_standard(mot, is);
@@ -4030,7 +4036,18 @@ void Navier_Stokes_FT_Disc::compute_eulerian_field_contact_forces
   collision_model.compute_lagrangian_contact_forces(two_phase_fluid,
                                                     particles_position,
                                                     particles_velocity,
-                                                    delta_t);
+                                                    delta_t,
+                                                    mesh);
+  // XXX debug files
+  std::ofstream f;
+  std::string path;
+  for(int i=0; i<particles_position.dimension(0); i++)
+    {
+      path = fichier_debug + "_" + std::to_string(i)+".txt";
+      f.open(path, std::ios::app);
+      f<<schema_temps().temps_courant()<<" "<<particles_position(i,0)<<" "<<particles_position(i,1)<<" "<<particles_position(i,2)<<"\n";
+      f.close();
+    }
 
 
   // Step 3: conservation of eulerian id number

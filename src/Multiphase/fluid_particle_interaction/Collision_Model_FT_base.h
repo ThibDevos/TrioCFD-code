@@ -60,10 +60,15 @@ public:
   int check_for_duplicates(ArrOfInt& vector);
   void compute_fictive_wall_coordinates(const double& radius);
 
+  void compute_dX_dU(DoubleTab& dX, DoubleTab& dU, const int& particle,\
+                     const int& neighbor, const DoubleTab& particles_position, const\
+                     DoubleTab& particles_velocity, const bool is_particle_particle_collision );
+
   virtual void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                                  const DoubleTab& particles_position,
                                                  const DoubleTab& particles_velocity,
-                                                 const double& deltat_simu)=0;
+                                                 const double& deltat_simu,
+                                                 const Maillage_FT_Disc& mesh)=0;
 
   virtual void discretize_contact_forces_eulerian_field(const DoubleTab& volumic_phase_indicator_function,
                                                         const Domaine_VF& domain_vf,
@@ -174,9 +179,6 @@ protected:
 
   OBS_PTR(Domaine) ref_domaine;
 
-  void compute_dX_dU(DoubleTab& dX, DoubleTab& dU, const int& particle,\
-                     const int& neighbor, const DoubleTab& particles_position, const\
-                     DoubleTab& particles_velocity, const bool is_particle_particle_collision );
 
 
   int get_nb_particles_j(const int ind_particle_i) const;
