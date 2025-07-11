@@ -262,7 +262,23 @@ void connec_compo_sommets(Maillage_FT_Disc const& maillage, IntLists& compo_somm
         }
     }
 }
+void connec_compo_facettes(Maillage_FT_Disc const& maillage, IntLists& compo_facettes)
+{
+  const int& nb_fa7 = maillage.nb_facettes();
 
+  ArrOfInt compo_connexes_fa7(nb_fa7); //compo_connexes_fa7(fa7) donne l'indice de la compo (particule) contenant la facette fa7
+  int n = search_connex_components_local_FT(maillage, compo_connexes_fa7);
+  int nb_compo_tot=compute_global_connex_components_FT(maillage, compo_connexes_fa7, n);
+
+  compo_facettes.dimensionner(nb_compo_tot); //compo_facettes[i] contient les indices des facettes composant la compo i
+  for(int fa7 = 0; fa7 < nb_fa7; ++fa7)
+    {
+      if (!maillage.facette_virtuelle(fa7))
+        {
+          compo_facettes[compo_connexes_fa7(fa7)].add_if_not(fa7);
+        }
+    }
+}
 void connec_sommets_fa7(Maillage_FT_Disc const& maillage, IntLists& sommets_facets)
 {
   const IntTab& facettes= maillage.facettes();

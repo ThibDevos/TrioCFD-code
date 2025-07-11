@@ -54,6 +54,7 @@ public:
   void resize_lagrangian_contact_force()
   {
     lagrangian_contact_forces_.resize(nb_particles_tot_,dimension);
+    lagrangian_contact_moments_.resize(nb_particles_tot_,dimension);
   }
   void resize_particles_collision_number() {particles_collision_number_.resize(nb_particles_tot_);}
   void associate_transport_equation(const Equation_base& equation);
@@ -67,6 +68,7 @@ public:
   virtual void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                                  const DoubleTab& particles_position,
                                                  const DoubleTab& particles_velocity,
+                                                 const DoubleTab& particles_rot_velocity,
                                                  const double& deltat_simu,
                                                  const Maillage_FT_Disc& mesh)=0;
 
@@ -171,6 +173,7 @@ protected:
   DoubleTab F_old_;
   DoubleTab F_now_;
   DoubleTab lagrangian_contact_forces_;
+  DoubleTab lagrangian_contact_moments_;
   DoubleVect collision_detected_;
   ArrOfInt list_upper_zone_;
   ArrOfInt list_lower_zone_;

@@ -12,10 +12,13 @@
 * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *****************************************************************************/
 
-#ifndef Modele_Collision_FT_sphere_included
-#define Modele_Collision_FT_sphere_included
+#ifndef Modele_Collision_FT_ellipsoid_included
+#define Modele_Collision_FT_ellipsoid_included
 
 #include <Collision_Model_FT_base.h>
+#include <Connex_components_FT.h>
+#include <Matrice_Dense.h>
+#include <fstream>
 
 /*! @brief : class Collision_Model_FT
  *
@@ -29,13 +32,36 @@
  *  process.
  */
 
-class Collision_Model_FT_sphere : public Collision_Model_FT_base
+class Collision_Model_FT_ellipsoid : public Collision_Model_FT_base
 {
-  Declare_instanciable_sans_constructeur(Collision_Model_FT_sphere);
+  Declare_instanciable_sans_constructeur(Collision_Model_FT_ellipsoid);
 
 public:
 
-  Collision_Model_FT_sphere();
+  Collision_Model_FT_ellipsoid();
+  int lire_motcle_non_standard(const Motcle&, Entree&) override;
+  int preparer_calcul(const Domaine_VDF& domain_vdf,
+                      const int nb_particles_tot,
+                      const Navier_Stokes_FT_Disc& ns,
+                      const Transport_Interfaces_FT_Disc& eq_transport,
+                      const Schema_Comm& schema_comm_FT);
+  void compute_fictive_wall_coordinates(const double& radius);
+  void  collision_point(Maillage_FT_Disc const& maillage, int i_closest, int j_closest, bool i_fa7, bool j_fa7, DoubleTab& xc);
+  void deepest_points(IntLists const& compo_sommets, IntLists const& sommets_facets, Maillage_FT_Disc const& mesh, int particle, int neighbor,
+                      DoubleTab const& positions, bool check_cg, DoubleTab& dX, int& i_closest, int& j_closest, bool& i_facet, bool& j_facet);
+  void closest_nodes(IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, int particle, int neighbor,
+                     DoubleTab const& positions, DoubleTab& dX, int& i_closest, int& j_closest, bool chek_cg, bool i_facet, bool j_facet);
+  void normal_i(Maillage_FT_Disc const& mesh, IntLists const& sommets_facets, bool i_facet, int i_closest, DoubleTab& n);
+  void normal_average_ij(Maillage_FT_Disc const& mesh,IntLists const& sommets_facets, bool i_facet, int i_closest, bool j_facet, int j_closest, DoubleTab& n);
+  void compute_dX_dU_normal(DoubleTab& dX, DoubleTab& dU, DoubleTab& norm, DoubleTab& cp, const int particle,
+                            const int neighbor, const DoubleTab& particles_position, const DoubleTab& particles_velocity, const bool is_particle_particle_collision,
+                            const IntLists& compo_sommets, const IntLists& sommets_facets, const Maillage_FT_Disc& mesh);
+
+
+  void compute_inertia_tensor(const Maillage_FT_Disc& mesh, int ind_particle_i,
+                              const DoubleTab& particles_position, Matrice_Dense& J);
+  DoubleTab compute_contact_moment(Matrice_Dense& Inertia, DoubleTab const& force, DoubleTab const& contact_point, DoubleTab const& Omega);
+
   void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                          const DoubleTab& particles_position,
                                          const DoubleTab& particles_velocity,
@@ -48,6 +74,12 @@ public:
                                                 const IntTab& particles_eulerian_id_number,
                                                 DoubleTab& contact_force_source_term) override;
 
+
+private:
+  enum class Collision_detection {DEEPEST, CLOSEST};
+  Collision_detection collision_detection_ = Collision_detection::DEEPEST;
+  enum class Collision_normal {NORMAL_I, NORMAL_IJ};
+  Collision_normal collision_normal_ = Collision_normal::NORMAL_IJ;
 };
 
 #endif

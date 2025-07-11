@@ -12,43 +12,39 @@
 * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *****************************************************************************/
 
-#ifndef Modele_Collision_FT_sphere_included
-#define Modele_Collision_FT_sphere_included
+#include <Solid_Particle_ellipsoid.h>
+#include <Probleme_FT_Disc_gen.h>
 
-#include <Collision_Model_FT_base.h>
 
-/*! @brief : class Collision_Model_FT
- *
- *  Description: This class enables to compute solid-solid
- *  interactions for fpi module under the framework of
- *  soft-sphere collision model. Under this framework,
- *  multiple collisions can occurs at the same time (ie a
- *  particle can collide with 2 or more particles). The
- *  collision is spread out on multiple time steps. A slight
- *  overlap (less than the mesh grid size) occurs during the
- *  process.
- */
+// XD Solid_Particle_ellipsoid Solid_Particle_base Solid_Particle_ellipsoid -1 spheroid particle for collision model
+Implemente_instanciable_sans_constructeur(Solid_Particle_ellipsoid,"Solid_Particle_ellipsoid",Solid_Particle_base);
 
-class Collision_Model_FT_sphere : public Collision_Model_FT_base
+Solid_Particle_ellipsoid::Solid_Particle_ellipsoid()
 {
-  Declare_instanciable_sans_constructeur(Collision_Model_FT_sphere);
+}
 
-public:
+Entree& Solid_Particle_ellipsoid::readOn (Entree& is)
+{
+  Solid_Particle_base::readOn(is); // do to first
+  set_equivalent_diameter(get_max_radius()*2); // for impact activation distance and Verlet tables detection
+  set_equivalent_radius(get_max_radius()); // for impact activation distance and Verlet tables detection
+  set_volume(4. * M_PI * x_radius * y_radius * z_radius / 3.);
+  const double solid_density = masse_volumique().valeurs()(0, 0);
+  set_mass(volume_*solid_density);
+  return is;
+}
 
-  Collision_Model_FT_sphere();
-  void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
-                                         const DoubleTab& particles_position,
-                                         const DoubleTab& particles_velocity,
-                                         const DoubleTab& particles_rot_velocity,
-                                         const double& deltat_simu,
-                                         const Maillage_FT_Disc& mesh) override;
+Sortie& Solid_Particle_ellipsoid::printOn(Sortie& os) const
+{
+  Cerr << "Error::printOn is not implemented." << finl;
+  Process::exit();
+  return os;
+}
 
-  void discretize_contact_forces_eulerian_field(const DoubleTab& volumic_phase_indicator_function,
-                                                const Domaine_VF& domain_vf,
-                                                const IntTab& particles_eulerian_id_number,
-                                                DoubleTab& contact_force_source_term) override;
-
-};
-
-#endif
-
+void Solid_Particle_ellipsoid::set_param(Param& param)
+{
+  Solid_Particle_base::set_param(param);
+  param.ajouter("x_radius", &x_radius, Param::REQUIRED); // XD_ADD_P double small half-axis of the spheroid
+  param.ajouter("y_radius", &y_radius, Param::REQUIRED); // XD_ADD_P double small half-axis of the spheroid
+  param.ajouter("z_radius", &z_radius, Param::REQUIRED); // XD_ADD_P double small half-axis of the spheroid
+}

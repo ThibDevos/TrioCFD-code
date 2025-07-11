@@ -12,43 +12,30 @@
 * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *****************************************************************************/
 
-#ifndef Modele_Collision_FT_sphere_included
-#define Modele_Collision_FT_sphere_included
+#ifndef Solid_Particle_ellipsoid_included
+#define Solid_Particle_ellipsoid_included
 
-#include <Collision_Model_FT_base.h>
+#include <Solid_Particle_base.h>
+#include <algorithm>
 
-/*! @brief : class Collision_Model_FT
- *
- *  Description: This class enables to compute solid-solid
- *  interactions for fpi module under the framework of
- *  soft-sphere collision model. Under this framework,
- *  multiple collisions can occurs at the same time (ie a
- *  particle can collide with 2 or more particles). The
- *  collision is spread out on multiple time steps. A slight
- *  overlap (less than the mesh grid size) occurs during the
- *  process.
- */
-
-class Collision_Model_FT_sphere : public Collision_Model_FT_base
+class Solid_Particle_ellipsoid : public Solid_Particle_base
 {
-  Declare_instanciable_sans_constructeur(Collision_Model_FT_sphere);
+  Declare_instanciable_sans_constructeur(Solid_Particle_ellipsoid);
 
 public:
 
-  Collision_Model_FT_sphere();
-  void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
-                                         const DoubleTab& particles_position,
-                                         const DoubleTab& particles_velocity,
-                                         const DoubleTab& particles_rot_velocity,
-                                         const double& deltat_simu,
-                                         const Maillage_FT_Disc& mesh) override;
+  Solid_Particle_ellipsoid();
 
-  void discretize_contact_forces_eulerian_field(const DoubleTab& volumic_phase_indicator_function,
-                                                const Domaine_VF& domain_vf,
-                                                const IntTab& particles_eulerian_id_number,
-                                                DoubleTab& contact_force_source_term) override;
+  void set_param(Param& param) override;
+  const double& get_x_radius() const { return x_radius; }
+  const double& get_y_radius() const { return y_radius; }
+  const double& get_z_radius() const { return z_radius; }
+  const double& get_max_radius() const {return std::max(x_radius, std::max(y_radius, z_radius));}
 
+protected:
+  double x_radius=0;
+  double y_radius=0;
+  double z_radius=0;
 };
 
 #endif
-

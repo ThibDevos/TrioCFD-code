@@ -39,6 +39,7 @@ Sortie& Collision_Model_FT_arbitrary::printOn(Sortie& os) const
 void Collision_Model_FT_arbitrary::compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                                                      const DoubleTab& particles_position,
                                                                      const DoubleTab& particles_velocity,
+                                                                     const DoubleTab& particles_rot_velocity,
                                                                      const double& deltat_simu,
                                                                      const Maillage_FT_Disc& mesh)
 {

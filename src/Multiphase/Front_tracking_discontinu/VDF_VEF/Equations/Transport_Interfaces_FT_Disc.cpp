@@ -7004,6 +7004,7 @@ void Transport_Interfaces_FT_Disc::calculer_vitesse_repere_local(const Maillage_
 {
   // const Maillage_FT_Disc & maillage = maillage_interface();
   //vitesse des centres d'aire
+  const DoubleTab& sommets = maillage.sommets();
   const int nb_facettes=maillage.nb_facettes();
   const IntTab& facettes=maillage.facettes ();
   const int dim3 = (deplacement.line_size() == 3);
@@ -7012,13 +7013,29 @@ void Transport_Interfaces_FT_Disc::calculer_vitesse_repere_local(const Maillage_
   int nb_compo_tot=compute_global_connex_components_FT(maillage, compo_connexe_facettes, n);
 
   DoubleTabFT normale;
+  DoubleTab Omega;
   calculer_normale_sommets_interface(maillage, normale);
   Positions.resize(nb_compo_tot,dimension);
   Vitesses.resize(nb_compo_tot,dimension);
+  Omega.resize(nb_compo_tot,dimension);
+  IntLists compo_connec_sommets; //compo_sommet[i] contient les indices des sommets composant la compo i
+  IntLists compo_connec_facet; //compo_connec_facete[i] contient les indices des facettes composant la compo i
+  connec_compo_sommets(maillage, compo_connec_sommets);
+  connec_compo_facettes(maillage, compo_connec_facet);
 
   calculer_vmoy_composantes_connexes(maillage, compo_connexe_facettes, nb_compo_tot,
                                      deplacement, Vitesses, Positions);
-
+  calculer_vitesses_rotation(maillage, compo_connec_sommets, compo_connec_facet, nb_compo_tot, deplacement, Vitesses, Omega, Positions);
+  std::ofstream f;
+  std::string path;
+  std::string file="positions/rotation";
+  for(int i=0; i<nb_compo_tot; i++)
+    {
+      path = file + "_" + std::to_string(i)+".txt";
+      f.open(path, std::ios::app);
+      f<<schema_temps().temps_courant()<<" "<<Omega(i,0)<<" "<<Omega(i,1)<<" "<<Omega(i,2)<<"\n";
+      f.close();
+    }
   // Calcul de la composante connexe des sommets
   // Attention un sommet peut n'etre rattache a aucune facette sur le meme processeur !
   // (il faudrait calculer les compo connexes sur les sommets, et ensuite passer aux faces
@@ -7052,7 +7069,17 @@ void Transport_Interfaces_FT_Disc::calculer_vitesse_repere_local(const Maillage_
         }
 
       const int compo = compo_sommets[som];
+      DoubleTab r(dimension);
+      r[0] = sommets(som,0) - Positions(compo,0);
+      r[1] = sommets(som,1) - Positions(compo,1);
+      r[2] = sommets(som,2) - Positions(compo,2);
 
+      //v_R = r x Omega
+      DoubleTab v_R(dimension);
+      for(int d=0; d<dimension; ++d)
+        {
+          v_R[d] = r[(d+1)%3]*Omega(compo,(d+2)%3) - r[(d+2)%3]*Omega(compo,(d+1)%3);
+        }
       // (v-vmoy) doit etre normal a l'interface
       // Donc on fait v_corrige = v_initial - composante_tangentielle_de(v_initial-vmoy)
       // Demonstration que (v_corrige - vmoy) est normal a l'interface :
@@ -7094,10 +7121,10 @@ void Transport_Interfaces_FT_Disc::calculer_vitesse_repere_local(const Maillage_
       if (norme_carre != 0.)
         {
           prodscal /= norme_carre;
-          deplacement(som, 0) = nx * prodscal* (1-is_solid_particle) + Vitesses(compo, 0);
-          deplacement(som, 1) = ny * prodscal* (1-is_solid_particle) + Vitesses(compo, 1);
+          deplacement(som, 0) = nx * prodscal* (1-is_solid_particle) + Vitesses(compo, 0) + v_R[0];
+          deplacement(som, 1) = ny * prodscal* (1-is_solid_particle) + Vitesses(compo, 1) + v_R[1];
           if (dim3)
-            deplacement(som, 2) = nz * prodscal* (1-is_solid_particle) + Vitesses(compo, 2); // BugFix reported from baltik TCL on 2020/10/26
+            deplacement(som, 2) = nz * prodscal* (1-is_solid_particle) + Vitesses(compo, 2) + v_R[2]; // BugFix reported from baltik TCL on 2020/10/26
         }
     }
 }
@@ -8227,6 +8254,7 @@ int Transport_Interfaces_FT_Disc::reprendre(Entree& is)
         if (collision_model_.non_nul())	collision_model_.valeur().reprendre(is);
         particles_position_collision_.resize(0,dimension);
         particles_velocity_collision_.resize(0,dimension);
+        particles_rot_velocity_collision_.resize(0,dimension);
         const int format_xyz = EcritureLectureSpecial::is_lecture_special();
         if (format_xyz)
           {
@@ -8236,6 +8264,9 @@ int Transport_Interfaces_FT_Disc::reprendre(Entree& is)
             for (int i=0; i<particles_velocity_collision_.dimension(0); i++)
               for (int j=0; j<particles_velocity_collision_.dimension(1); j++)
                 is>>particles_velocity_collision_(i,j);
+            for (int i=0; i<particles_rot_velocity_collision_.dimension(0); i++)
+              for (int j=0; j<particles_rot_velocity_collision_.dimension(1); j++)
+                is>>particles_rot_velocity_collision_(i,j);
             return 1;
           }
         else if (TRUST_2_PDI::is_PDI_restart())
@@ -8247,6 +8278,7 @@ int Transport_Interfaces_FT_Disc::reprendre(Entree& is)
           {
             is >> particles_position_collision_;
             is >> particles_velocity_collision_;
+            is >> particles_rot_velocity_collision_;
           }
         const Domaine& domain = domaine_dis().domaine();
         domain.chercher_elements(particles_position_collision_, gravity_center_elem_);
@@ -9490,6 +9522,69 @@ void Transport_Interfaces_FT_Disc::calculer_vmoy_composantes_connexes(const Mail
 
 }
 
+/*! @brief calcul la vitesses de rotation au niveau des marqueurs lagrangiens
+*
+*
+*/
+void Transport_Interfaces_FT_Disc::calculer_vitesses_rotation(const Maillage_FT_Disc& maillage, const IntLists& compo_connexe_sommets, const IntLists& compo_connexe_facettes,
+                                                              int nb_compo_tot, const DoubleTab& vitesse_sommets,
+                                                              const DoubleTab& Vitesses, DoubleTab& Omega,
+                                                              const DoubleTab& Positions) const
+{
+  DoubleTab sommets = maillage.sommets();
+// IntTab facettes = maillage.facettes();
+// int nb_fa7 = facettes.dimension(0);
+// const ArrOfDouble& surface_facettes = maillage.get_update_surface_facettes();
+
+  DoubleTab A(dimension, dimension);
+  DoubleTab AtA_loc(dimension, dimension); //A^t A
+  DoubleTab x_cg(dimension);
+  DoubleTab r(dimension);
+  DoubleTab b(dimension); //rhs : b = vitesse du sommet - vitesse de translation de la particule
+  DoubleTab Atb_loc(dimension); //A^T b
+  DoubleVect Atb(dimension); //A^T b
+  Matrice_Dense AtA(dimension, dimension);
+// double rho = milieu().masse_volumique().valeurs()(0,0);
+  for(int compo=0; compo<nb_compo_tot; ++compo)
+    {
+      for(int d=0; d<dimension; ++d) {x_cg(d) = Positions(compo,d);}
+
+
+// for(int i_som=0; i_som<2; ++i_som)
+      for(int i_som=0; i_som<compo_connexe_sommets[compo].size(); ++i_som)
+        {
+          int i_global = compo_connexe_sommets[compo][i_som];
+          for(int d=0; d<dimension; ++d)
+            {
+              r(d) = sommets(i_global,d) - x_cg(d);
+              b(d) = vitesse_sommets(i_global,d) - Vitesses(compo,d);
+            }
+          for(int i=0; i<dimension; ++i)
+            {
+              Atb_loc(i) = r[(i+2)%3]*b[(i+1)%3] - r[(i+1)%3]*b[(i+2)%3];
+              Atb[i] += Atb_loc(i);
+
+              AtA_loc(i,i) = r[(i+2)%3]*r[(i+2)%3] + r[(i+1)%3]*r[(i+1)%3];
+              AtA(i,i) += AtA_loc(i,i);
+              for(int j=i+1; j<dimension; ++j)
+                {
+                  AtA_loc(i,j) = -r[i]*r[j];
+                  AtA_loc(j,i) = AtA_loc(i,j);
+
+                  AtA(i,j) += AtA_loc(i,j);
+                  AtA(j,i) += AtA_loc(j,i);
+                }
+            }
+        }
+
+      AtA.inverse(); //AtA is now the inverse of AtA previously computed
+      DoubleVect omega(dimension);
+      AtA.ajouter_multvect_(Atb,omega); //omega = AtA \cdot Atb
+      for(int d=0; d<dimension; ++d) {Omega(compo,d) = omega[d];}
+    }
+  particles_rot_velocity_collision_ = Omega;
+}
+
 void Transport_Interfaces_FT_Disc::ramasse_miettes(const Maillage_FT_Disc& maillage,
                                                    DoubleVect& flux,
                                                    DoubleVect& valeurs)
@@ -9727,8 +9822,10 @@ void Transport_Interfaces_FT_Disc::init_particles_position_velocity()
       Cerr << "WARNING, renumbering particles !" << finl;
       particles_position_collision_.resize(nb_particles_tot, dimension);
       particles_velocity_collision_.resize(nb_particles_tot, dimension);
+      particles_rot_velocity_collision_.resize(nb_particles_tot, dimension);
       particles_position_collision_ = 0.;
       particles_velocity_collision_ = 0;
+      particles_rot_velocity_collision_ = 0;
 
       const ArrOfDouble& surface_facettes = mesh.get_update_surface_facettes();
       const IntTab& facettes = mesh.facettes();
@@ -9795,6 +9892,7 @@ void Transport_Interfaces_FT_Disc::swap_particles_lagrangian_position_velocity()
   int nb_particles_tot = particles_position_collision_.dimension(0);
   DoubleTab correct_particles_position(nb_particles_tot, dimension);
   DoubleTab correct_particles_velocity(nb_particles_tot, dimension);
+  DoubleTab correct_particles_rot_velocity(nb_particles_tot, dimension);
   IntVect particles_correct_id_number(nb_particles_tot);
 
   // Step 1: Identification of the elements which contain particles gravity center
@@ -9823,10 +9921,12 @@ void Transport_Interfaces_FT_Disc::swap_particles_lagrangian_position_velocity()
         {
           correct_particles_position(good_id_number, d) = particles_position_collision_(wrong_id_number, d);
           correct_particles_velocity(good_id_number, d) = particles_velocity_collision_(wrong_id_number, d);
+          correct_particles_rot_velocity(good_id_number, d) = particles_rot_velocity_collision_(wrong_id_number, d);
         }
     }
   particles_position_collision_ = correct_particles_position;
   particles_velocity_collision_ = correct_particles_velocity;
+  particles_rot_velocity_collision_ = correct_particles_rot_velocity;
 }
 
 void Transport_Interfaces_FT_Disc::compute_particles_rms()

@@ -4018,6 +4018,7 @@ void Navier_Stokes_FT_Disc::compute_eulerian_field_contact_forces
   //const OWN_PTR(Collision_Model_FT_base)& collision_model_ptr=eq_transport.get_ptr_collision_model();
   const DoubleTab& particles_position=eq_transport.get_particles_position();
   const DoubleTab& particles_velocity=eq_transport.get_particles_velocity();
+  const DoubleTab& particles_rot_velocity=eq_transport.get_particles_rot_velocity();
   const Fluide_Diphasique& two_phase_fluid = fluide_diphasique();
 
   // Step 1: Collision detection
@@ -4036,6 +4037,7 @@ void Navier_Stokes_FT_Disc::compute_eulerian_field_contact_forces
   collision_model.compute_lagrangian_contact_forces(two_phase_fluid,
                                                     particles_position,
                                                     particles_velocity,
+                                                    particles_rot_velocity,
                                                     delta_t,
                                                     mesh);
   // XXX debug files
