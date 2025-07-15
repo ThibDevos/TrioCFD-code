@@ -150,6 +150,7 @@ void Collision_Model_FT_sphere::discretize_contact_forces_eulerian_field(
   const DoubleTab& volumic_phase_indicator_function,
   const Domaine_VF& domain_vf,
   const IntTab& particles_eulerian_id_number,
+  const DoubleTab& particles_position,
   DoubleTab& contact_force_source_term)
 {
   const DoubleVect& interlaced_volumes=domain_vf.volumes_entrelaces();

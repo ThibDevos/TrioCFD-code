@@ -4075,6 +4075,7 @@ void Navier_Stokes_FT_Disc::compute_eulerian_field_contact_forces
     volumic_phase_indicator_function_face,
     domain_vf,
     particles_eulerian_id_number_,
+    particles_position,
     contact_force);
 
   statistiques().end_count(count);

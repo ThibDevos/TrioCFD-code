@@ -664,12 +664,20 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               for(int i=0; i<dimension; ++i)
                 {
                   J(i,i) = 0.4*(1.5e-3)*1.5e-3;
-                  for(int j=0; j<dimension; ++j)
+                  for(int j=i+1; j<dimension; ++j)
                     {
                       J(i,j)=0.;
+                      J(j,i)=0.;
                     }
                 }
-              DoubleTab moment_contact=compute_contact_moment(J,force_contact, collision_point, particles_rot_velocity);
+              DoubleTab r(dimension);
+              r(0) = particles_position(particle_i,0) - collision_point(0);
+              r(1) = particles_position(particle_i,1) - collision_point(1);
+              r(2) = particles_position(particle_i,2) - collision_point(2);
+              DoubleTab moment_contact=compute_contact_moment(J,force_contact, r, particles_rot_velocity);
+              std::cout<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
+              std::cout<<moment_contact(0)<<" "<<moment_contact(1)<<" "<<moment_contact(2)<<"\n";
+              // exit();
               for (int d = 0; d < dimension; d++)
                 {
                   lagrangian_contact_forces_(particle_i, d) += fabs(force_contact(d)) <=
@@ -679,13 +687,13 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                   if (!is_particle_particle_collision)
                     continue; // wall collision, no force to apply on the wall
                   lagrangian_contact_forces_(particle_j, d) -= fabs(force_contact(d)) <=
-                                                               min_threshold ? 0 :  force_contact(d) /*/ volume*/;
-                  lagrangian_contact_moments_(particle_j, d) += fabs(moment_contact(d)) <=
-                                                                min_threshold ? 0 : moment_contact(d) /*/ volume*/;
+                                                               min_threshold ? 0 :  force_contact(d) / volume;
+                  lagrangian_contact_moments_(particle_j, d) -= fabs(moment_contact(d)) <=
+                                                                min_threshold ? 0 : moment_contact(d) / volume;
                 }
 
+              F_old_(particle_i, particle_j) = F_now_(particle_i, particle_j);
             }
-          F_old_(particle_i, particle_j) = F_now_(particle_i, particle_j);
         }
     }
 
@@ -708,13 +716,27 @@ DoubleTab Collision_Model_FT_ellipsoid::compute_contact_moment(Matrice_Dense& In
   DoubleTab temp(dimension);
   DoubleTab InertiaOmega(dimension);
   Inertia.ajouter_multvect_(Omega,InertiaOmega);
+  std::cout<<Inertia(0,0)<<" "<<Inertia(0,1)<<" "<<Inertia(0,2)<<"\n";
+  std::cout<<Inertia(1,0)<<" "<<Inertia(1,1)<<" "<<Inertia(1,2)<<"\n";
+  std::cout<<Inertia(2,0)<<" "<<Inertia(2,1)<<" "<<Inertia(2,2)<<"\n";
+  std::cout<<"=========================\n";
   Inertia.inverse(); //Inertia is now its inverse
   for(int d = 0; d<dimension; ++d)
     {
       temp[d] = (r[(d+1)%3] * force[(d+2)%3] - r[(d+2)%3] * force[(d+1)%3]) -
-                (Omega[(d+1)%3] - InertiaOmega[(d+2)%3] - Omega[(d+2)%3] - InertiaOmega[(d+1)%3]);
+                (Omega[(d+1)%3] * InertiaOmega[(d+2)%3] - Omega[(d+2)%3] * InertiaOmega[(d+1)%3]);
     }
+  std::cout<<Inertia(0,0)<<" "<<Inertia(0,1)<<" "<<Inertia(0,2)<<"\n";
+  std::cout<<Inertia(1,0)<<" "<<Inertia(1,1)<<" "<<Inertia(1,2)<<"\n";
+  std::cout<<Inertia(2,0)<<" "<<Inertia(2,1)<<" "<<Inertia(2,2)<<"\n";
+  std::cout<<"=========================\n";
+  std::cout<<r(0)<<" "<<r(1)<<" "<<r(2)<<"\n";
+  std::cout<<InertiaOmega(0)<<" "<<InertiaOmega(1)<<" "<<InertiaOmega(2)<<"\n";
+  std::cout<<Omega(0)<<" "<<Omega(1)<<" "<<Omega(2)<<"\n";
+  std::cout<<temp(0)<<" "<<temp(1)<<" "<<temp(2)<<"\n";
   Inertia.ajouter_multvect_(temp,contact_moment);
+  std::cout<<contact_moment(0)<<" "<<contact_moment(1)<<" "<<contact_moment(2)<<"\n";
+  std::cout<<"---------------------------\n";
   return contact_moment;
 }
 
@@ -722,6 +744,7 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   const DoubleTab& volumic_phase_indicator_function,
   const Domaine_VF& domain_vf,
   const IntTab& particles_eulerian_id_number,
+  const DoubleTab& particles_position,
   DoubleTab& contact_force_source_term)
 {
   const DoubleVect& interlaced_volumes=domain_vf.volumes_entrelaces();
@@ -741,7 +764,8 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
           const int ori=orientation(face);
           contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
                                           *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori)
-                                                                     + (lagrangian_contact_moments_(id_number,(ori+1)%3) * cg_faces(face,(ori+2)%3) -lagrangian_contact_moments_(id_number,(ori+2)%3) * cg_faces(face,(ori+1)%3))) ;
+                                                                     + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (particles_position(id_number,(ori+2)%3) - cg_faces(face,(ori+2)%3)) -
+                                                                        lagrangian_contact_moments_(id_number,(ori+2)%3) * (particles_position(id_number,(ori+1)%3) - cg_faces(face,(ori+1)%3)))) ;
         }
     }
 }
