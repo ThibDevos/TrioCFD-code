@@ -748,7 +748,7 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   DoubleTab& contact_force_source_term)
 {
   const DoubleVect& interlaced_volumes=domain_vf.volumes_entrelaces();
-  const DoubleTab& cg_faces=domain_vf.xp();
+  const DoubleTab& cg_faces=domain_vf.xv();
   const int nb_faces=interlaced_volumes.size_array();
   const IntVect& orientation = domain_vf.orientation();
   const IntTab& face_voisins=domain_vf.face_voisins();
