@@ -95,6 +95,8 @@ public:
     const int& particle_j,
     const int& is_compression_step,
     const double& is_collision_part_part);
+  DoubleTab compute_tangential_contact_force(double tangential_displacement, DoubleTab const& tang,
+                                             double friction_coef, DoubleTab const& normal_force, const double& is_collision_part_part);
 
   double compute_ewet_legendre(const double& St) {return exp(-35 / (St + 1e-6));} // See: D. Legendre et al, Chem. Eng. Sci., (2006).
 

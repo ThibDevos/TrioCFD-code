@@ -108,7 +108,7 @@ void Collision_Model_FT_sphere::compute_lagrangian_contact_forces(const Fluide_D
               const double impact_Stokes = solid_density * 2 * effective_radius * impact_velocity /
                                            (9 * fluid_viscosity);
               if (is_start_of_collision)
-                e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes)/compute_ewet_legendre(impact_Stokes);
+                e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes);
               DoubleTab force_contact=compute_contact_force(
                                         next_dist_between_particles,
                                         norm,

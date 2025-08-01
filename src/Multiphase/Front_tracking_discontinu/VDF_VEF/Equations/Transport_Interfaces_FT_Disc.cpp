@@ -9544,13 +9544,12 @@ void Transport_Interfaces_FT_Disc::calculer_vitesses_rotation(const Maillage_FT_
   DoubleTab Atb_loc(dimension); //A^T b
   DoubleVect Atb(dimension); //A^T b
   Matrice_Dense AtA(dimension, dimension);
-// double rho = milieu().masse_volumique().valeurs()(0,0);
   for(int compo=0; compo<nb_compo_tot; ++compo)
     {
-      for(int d=0; d<dimension; ++d) {x_cg(d) = Positions(compo,d);}
+      AtA.clean();
+      for(int d=0; d<dimension; ++d) {x_cg(d) = Positions(compo,d); Atb(d)=0.; AtA_loc(d)=0.;}
 
 
-// for(int i_som=0; i_som<2; ++i_som)
       for(int i_som=0; i_som<compo_connexe_sommets[compo].size(); ++i_som)
         {
           int i_global = compo_connexe_sommets[compo][i_som];
@@ -9561,10 +9560,10 @@ void Transport_Interfaces_FT_Disc::calculer_vitesses_rotation(const Maillage_FT_
             }
           for(int i=0; i<dimension; ++i)
             {
-              Atb_loc(i) = r[(i+2)%3]*b[(i+1)%3] - r[(i+1)%3]*b[(i+2)%3];
+              Atb_loc(i) = r[(i+1)%3]*b[(i+2)%3] - r[(i+2)%3]*b[(i+1)%3];
               Atb[i] += Atb_loc(i);
 
-              AtA_loc(i,i) = r[(i+2)%3]*r[(i+2)%3] + r[(i+1)%3]*r[(i+1)%3];
+              AtA_loc(i,i) = -r[(i+2)%3]*r[(i+2)%3] - r[(i+1)%3]*r[(i+1)%3];
               AtA(i,i) += AtA_loc(i,i);
               for(int j=i+1; j<dimension; ++j)
                 {
@@ -9580,6 +9579,9 @@ void Transport_Interfaces_FT_Disc::calculer_vitesses_rotation(const Maillage_FT_
       AtA.inverse(); //AtA is now the inverse of AtA previously computed
       DoubleVect omega(dimension);
       AtA.ajouter_multvect_(Atb,omega); //omega = AtA \cdot Atb
+      ofstream f;
+      f.open("positions/test_rot.txt", std::ios::app);
+      f<<compo<<" "<<omega[0]<<" "<<omega[1]<<" "<<omega[2]<<"\n";
       for(int d=0; d<dimension; ++d) {Omega(compo,d) = omega[d];}
     }
   particles_rot_velocity_collision_ = Omega;

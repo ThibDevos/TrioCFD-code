@@ -48,6 +48,7 @@ void Collision_Model_FT_base::set_param(Param& p)
   p.ajouter_non_std("detection_method", (this),Param::REQUIRED); // XD_ADD_P chaine method to detect collisions
   p.ajouter_non_std("collision_detection", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision detection when using FT
   p.ajouter_non_std("collision_normal", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision normal when using FT
+  p.ajouter_non_std("fichier_debug", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision normal when using FT
   p.ajouter("collision_duration", &collision_duration_, Param::REQUIRED); // XD_ADD_P double duration of the collision in seconds;
   p.ajouter("activate_collision_before_impact", &is_collision_activated_before_impact_, Param::REQUIRED); // XD_ADD_P int activate collision before impact (1) or not (0)
   p.ajouter("activation_distance_percentage_diameter", &activation_distance_percentage_diameter_, Param::REQUIRED); // XD_ADD_P double activation distance of the collision process as a percentage of the particle diameter
@@ -720,6 +721,26 @@ DoubleTab Collision_Model_FT_base::compute_contact_force(
     Process::exit("Collision_Model_FT_base::compute_contact_force unknown collision_model_");
 
   return force_contact;
+}
+
+DoubleTab Collision_Model_FT_base::compute_tangential_contact_force(double tangential_displacement, DoubleTab const& tang,
+                                                                    double friction_coef, DoubleTab const& normal_force, const double& is_collision_part_part)
+{
+  DoubleTab force(dimension), f_dynamic(dimension), f_static(dimension);
+  double f_dynamic_n = sqrt(local_carre_norme_vect(normal_force));
+  const double stiffness = is_collision_part_part ? stiffness_breugem_part_part_:
+                           stiffness_breugem_wall_part_;
+  for(int d=0; d<dimension; ++d)
+    {
+      f_dynamic(d) = -friction_coef*f_dynamic_n*tang(d);
+      f_static(d) = -stiffness*tangential_displacement*tang(d);
+    }
+  double min_f = std::min(sqrt(local_carre_norme_vect(f_dynamic)), sqrt(local_carre_norme_vect(f_static)));
+  for(int d=0; d<dimension; ++d)
+    {
+      force(d) = -tang(d)*min_f;
+    }
+  return force;
 }
 
 void Collision_Model_FT_base::discretize_contact_forces_eulerian_field(

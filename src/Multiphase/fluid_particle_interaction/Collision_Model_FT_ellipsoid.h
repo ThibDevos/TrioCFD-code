@@ -54,12 +54,12 @@ public:
   void normal_i(Maillage_FT_Disc const& mesh, IntLists const& sommets_facets, bool i_facet, int i_closest, DoubleTab& n);
   void normal_average_ij(Maillage_FT_Disc const& mesh,IntLists const& sommets_facets, bool i_facet, int i_closest, bool j_facet, int j_closest, DoubleTab& n);
   void compute_dX_dU_normal(DoubleTab& dX, DoubleTab& dU, DoubleTab& norm, DoubleTab& cp, const int particle,
-                            const int neighbor, const DoubleTab& particles_position, const DoubleTab& particles_velocity, const bool is_particle_particle_collision,
+                            const int neighbor, const DoubleTab& particles_position, const DoubleTab& particles_velocity, const DoubleTab& particles_rot_velocity, const bool is_particle_particle_collision,
                             const IntLists& compo_sommets, const IntLists& sommets_facets, const Maillage_FT_Disc& mesh);
 
 
   void compute_inertia_tensor(const Maillage_FT_Disc& mesh, int ind_particle_i,
-                              const DoubleTab& particles_position, Matrice_Dense& J);
+                              const DoubleTab& particles_position, Matrice_Dense& J, double& volume, double density);
   DoubleTab compute_contact_moment(Matrice_Dense& Inertia, DoubleTab const& force, DoubleTab const& contact_point, DoubleTab const& Omega);
 
   void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
@@ -81,6 +81,9 @@ private:
   Collision_detection collision_detection_ = Collision_detection::DEEPEST;
   enum class Collision_normal {NORMAL_I, NORMAL_IJ};
   Collision_normal collision_normal_ = Collision_normal::NORMAL_IJ;
+
+  // XXX debug
+  Motcle fichier_debug;
 };
 
 #endif

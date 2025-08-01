@@ -231,6 +231,8 @@ std::vector<YAML_data> Navier_Stokes_FT_Disc::data_a_sauvegarder() const
     {
       std::vector<YAML_data> particles = particles_eulerian_id_number_post_->data_a_sauvegarder();
       data.insert(data.end(), particles.begin(), particles.end());
+      std::vector<YAML_data> forces = variables_internes().contact_force_source_term->data_a_sauvegarder();
+      data.insert(data.end(), forces.begin(), forces.end());
     }
   return data;
 }
@@ -241,6 +243,7 @@ int Navier_Stokes_FT_Disc::sauvegarder(Sortie& os) const
   bytes += Navier_Stokes_Turbulent::sauvegarder(os);
   if (is_solid_particle_)
     bytes += particles_eulerian_id_number_post_->sauvegarder(os);
+  bytes+= variables_internes().contact_force_source_term->sauvegarder(os);
   return bytes;
 }
 

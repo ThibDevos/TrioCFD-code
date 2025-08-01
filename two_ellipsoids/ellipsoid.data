@@ -9,7 +9,7 @@ Mailler dom
 	Pave Cavite
 		{
 		Origine -4.5e-3  0. -4.5e-3
-		Nombre_de_Noeuds 21 31 21
+		Nombre_de_Noeuds 31 41 31
 		Longueurs 9e-3 12e-3 9e-3
 		}
 		{
@@ -28,9 +28,9 @@ Schema_Euler_explicite sch
 Lire sch
 {
 	tinit 0
-	tmax 0.2
+	tmax 0.7
  	# nb_pas_dt_max 2 #
-    	dt_min 1e-7
+    	dt_min 1e-8
 	dt_max 3.75e-5
 	diffusion_implicite 1
     	seuil_diffusion_implicite 1e-6
@@ -41,7 +41,7 @@ Lire sch
 
 }
 
-system "mkdir -p Test_moments"
+system "mkdir -p check_J_Breugem"
 
 Associate pb dom
 Associate pb sch
@@ -60,18 +60,18 @@ Lire pb
 	{
 		fluide0 Solid_Particle_ellipsoid
 		{
-			mu  Champ_Uniforme 1 10
+			mu  Champ_Uniforme 1 0.15
 			rho Champ_Uniforme 1 7800
 			e_dry	0.97
-			x_radius  1.5e-3
-			y_radius  1.5e-3
+			x_radius  1e-3
+			y_radius  2e-3
 			z_radius  1.5e-3
 
 		}
 		fluide1 Fluide_Incompressible
 		{
-			mu  Champ_Uniforme 1 1e-2
-			rho Champ_Uniforme 1 935
+			mu  Champ_Uniforme 1 1.007e-3
+			rho Champ_Uniforme 1 998
 		}
 		
 		sigma   Champ_Uniforme 1 0.
@@ -103,7 +103,7 @@ Lire pb
 			Devant	paroi_fixe
 			Derriere paroi_fixe
 		}
-		fichier_debug positions/positions
+		fichier_debug positions_breugem/positions
 
 	}
 	interf
@@ -112,10 +112,8 @@ Lire pb
 		methode_transport vitesse_interpolee hydraulique
 		conditions_initiales
 		{
-
-		   fonction  (+1*(((x+1.5e-3)/1.5)^2+(y-10.35e-3)^2+(z)^2-(1.5e-3)^2)) ,
-		   fonction_ignorer_collision ajout_phase0 (+1*((x-1.e-3)^2+(y-6.88e-3)^2+(z)^2-(1.5e-3)^2))
-
+		 fonction (+1*((((x-0.)*0.707+(y-9e-3)*0.707)/1.e-3)^2+(((x-0.)*0.707-(y-9e-3)*0.707)/2e-3)^2+(z/1.5e-3)^2-(1)^2))  ,
+		 fonction_ignorer_collision ajout_phase0 (+1*((((x-0.)*0.707-(y-3e-3)*0.707)/1.e-3)^2+(((x-0.)*0.707+(y-3e-3)*0.707)/2e-3)^2+(z/1.5e-3)^2-(1)^2)) 
        		}
         	iterations_correction_volume 0
        		n_iterations_distance 0
@@ -123,7 +121,8 @@ Lire pb
 		methode_interpolation_v VDF_lineaire
 		collision_model_fpi Collision_Model_FT_ellipsoid
                 {
-                        collision_model hybrid_esi
+                        collision_model breugem
+                        fichier_debug positions_breugem/closest_point
                         detection_method
                         {
                                 check_all
@@ -136,6 +135,7 @@ Lire pb
                         force_on_two_phase_elem 0
                         collision_detection closest_point
                         collision_normal normal_average_ij 
+                        
                 }
 
                 remaillage
@@ -176,14 +176,15 @@ Lire pb
 	{
 		Postraitement_ft_lata post2
 		{
-			fichier Test_moments/post_dom
+			fichier check_J_Breugem/post_dom
 			format lata_v2
 			champs dt_post 3.75e-4
 	        	{ 
 				indicatrice_interf elem
 				vitesse  elem
 				pression elem
-				vitesse faces
+				vitesse faces 
+				CONTACT_FORCE_SOURCE_TERM faces
 			}
 			
 			interfaces interf
@@ -192,6 +193,7 @@ Lire pb
 				courbure som
 				normale_unitaire elem
 				compo_connexe elem
+
 			}
 			
 		}
