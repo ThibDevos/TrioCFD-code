@@ -59,8 +59,8 @@ public:
 
 
   void compute_inertia_tensor(const Maillage_FT_Disc& mesh, int ind_particle_i,
-                              const DoubleTab& particles_position, Matrice_Dense& J, double& volume, double density);
-  DoubleTab compute_contact_moment(Matrice_Dense& Inertia, DoubleTab const& force, DoubleTab const& contact_point, DoubleTab const& Omega);
+                              const DoubleTab& particles_position, const IntLists& compo_connexe_facets, Matrice_Dense& J, double& volume, double density);
+  DoubleTab compute_contact_moment(Matrice_Dense Inertia, DoubleTab const& force, DoubleTab const& contact_point, DoubleTab const& Omega);
 
   void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                          const DoubleTab& particles_position,

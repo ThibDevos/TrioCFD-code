@@ -60,6 +60,8 @@
 #include <TRUST_2_PDI.h>
 #include <Avanc.h>
 
+#include <Process.h>
+
 #include <map>
 #include <variant>
 #include <functional>
@@ -9553,34 +9555,46 @@ void Transport_Interfaces_FT_Disc::calculer_vitesses_rotation(const Maillage_FT_
       for(int i_som=0; i_som<compo_connexe_sommets[compo].size(); ++i_som)
         {
           int i_global = compo_connexe_sommets[compo][i_som];
-          for(int d=0; d<dimension; ++d)
+          if(!maillage.sommet_virtuel(i_global))
             {
-              r(d) = sommets(i_global,d) - x_cg(d);
-              b(d) = vitesse_sommets(i_global,d) - Vitesses(compo,d);
-            }
-          for(int i=0; i<dimension; ++i)
-            {
-              Atb_loc(i) = r[(i+1)%3]*b[(i+2)%3] - r[(i+2)%3]*b[(i+1)%3];
-              Atb[i] += Atb_loc(i);
-
-              AtA_loc(i,i) = -r[(i+2)%3]*r[(i+2)%3] - r[(i+1)%3]*r[(i+1)%3];
-              AtA(i,i) += AtA_loc(i,i);
-              for(int j=i+1; j<dimension; ++j)
+              for (int d = 0; d < dimension; ++d)
                 {
-                  AtA_loc(i,j) = -r[i]*r[j];
-                  AtA_loc(j,i) = AtA_loc(i,j);
+                  r(d) = sommets(i_global, d) - x_cg(d);
+                  b(d) = vitesse_sommets(i_global, d) - Vitesses(compo, d);
+                }
+              for (int i = 0; i < dimension; ++i)
+                {
+                  Atb_loc(i) = r[(i + 1) % 3] * b[(i + 2) % 3] - r[(i + 2) % 3] * b[(i + 1) % 3];
+                  Atb[i] += Atb_loc(i);
 
-                  AtA(i,j) += AtA_loc(i,j);
-                  AtA(j,i) += AtA_loc(j,i);
+                  AtA_loc(i, i) = -r[(i + 2) % 3] * r[(i + 2) % 3] - r[(i + 1) % 3] * r[(i + 1) % 3];
+                  A(i, i) += AtA_loc(i, i);
+                  for (int j = i + 1; j < dimension; ++j)
+                    {
+                      AtA_loc(i, j) = -r[i] * r[j];
+                      AtA_loc(j, i) = AtA_loc(i, j);
+
+                      A(i, j) += AtA_loc(i, j);
+                      A(j, i) += AtA_loc(j, i);
+                    }
                 }
             }
         }
-
+      mp_sum_for_each_item(Atb);
+      mp_sum_for_each_item(A);
+      for(int i=0; i<dimension; ++i)
+        {
+          for(int j=0; j<dimension; ++j)
+            {
+              AtA(i,j) = A(i,j);
+            }
+        }
       AtA.inverse(); //AtA is now the inverse of AtA previously computed
       DoubleVect omega(dimension);
       AtA.ajouter_multvect_(Atb,omega); //omega = AtA \cdot Atb
       ofstream f;
-      f.open("positions/test_rot.txt", std::ios::app);
+      std::string path = "positions/test_rot_" + std::to_string(Process::me())+".txt";
+      f.open(path, std::ios::app);
       f<<compo<<" "<<omega[0]<<" "<<omega[1]<<" "<<omega[2]<<"\n";
       for(int d=0; d<dimension; ++d) {Omega(compo,d) = omega[d];}
     }

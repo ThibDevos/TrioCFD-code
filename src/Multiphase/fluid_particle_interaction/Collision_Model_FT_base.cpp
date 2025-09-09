@@ -156,6 +156,7 @@ void Collision_Model_FT_base::reset()
   F_old_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
   F_now_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
   e_eff_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
+  e_eff_t.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
   Cerr << "WARNING: Collision_Model_FT_base::reset of F_old_, F_now_, "
        "lagrangian_contact_forces_ and e_eff_." << finl;
 }
@@ -275,7 +276,9 @@ void Collision_Model_FT_base::set_spring_properties(const Solid_Particle_base& s
       const double mass_eff_wall_part = mass_sphere;
 
       stiffness_breugem_part_part_ = compute_stiffness_breugem(mass_eff_part_part,e_dry);
+      stiffness_breugem_part_part_tangent = compute_stiffness_breugem(mass_eff_part_part,0.39);
       stiffness_breugem_wall_part_ = compute_stiffness_breugem(mass_eff_wall_part,e_dry);
+      stiffness_breugem_wall_part_tangent = compute_stiffness_breugem(mass_eff_wall_part,0.39);
 
       if (collision_model_ == Collision_model::BREUGEM)
         {
@@ -723,24 +726,28 @@ DoubleTab Collision_Model_FT_base::compute_contact_force(
   return force_contact;
 }
 
-DoubleTab Collision_Model_FT_base::compute_tangential_contact_force(double tangential_displacement, DoubleTab const& tang,
-                                                                    double friction_coef, DoubleTab const& normal_force, const double& is_collision_part_part)
+void Collision_Model_FT_base::compute_tangential_contact_force(double tangential_displacement, DoubleTab const& tang, double e_eff_particle,
+                                                               double friction_coef, DoubleTab const& normal_force, const int& is_compression_step, const double& is_collision_part_part,
+                                                               DoubleTab& tangential_force_contact)
 {
   DoubleTab force(dimension), f_dynamic(dimension), f_static(dimension);
   double f_dynamic_n = sqrt(local_carre_norme_vect(normal_force));
-  const double stiffness = is_collision_part_part ? stiffness_breugem_part_part_:
-                           stiffness_breugem_wall_part_;
+  const double stiffness = is_collision_part_part ? stiffness_breugem_part_part_tangent:
+                           stiffness_breugem_wall_part_tangent;
+
+
   for(int d=0; d<dimension; ++d)
     {
-      f_dynamic(d) = -friction_coef*f_dynamic_n*tang(d);
-      f_static(d) = -stiffness*tangential_displacement*tang(d);
+      tangential_force_contact(d) += -std::fabs(pow(e_eff_particle,2) * stiffness * tangential_displacement);
     }
-  double min_f = std::min(sqrt(local_carre_norme_vect(f_dynamic)), sqrt(local_carre_norme_vect(f_static)));
-  for(int d=0; d<dimension; ++d)
+  double f_static_t = sqrt(local_carre_norme_vect(tangential_force_contact));
+  if(f_static_t>std::fabs(friction_coef*f_dynamic_n))
     {
-      force(d) = -tang(d)*min_f;
+      for(int d=0; d<dimension; ++d)
+        {
+          tangential_force_contact(d) = -std::fabs(friction_coef*f_dynamic_n) * tang(d);
+        }
     }
-  return force;
 }
 
 void Collision_Model_FT_base::discretize_contact_forces_eulerian_field(

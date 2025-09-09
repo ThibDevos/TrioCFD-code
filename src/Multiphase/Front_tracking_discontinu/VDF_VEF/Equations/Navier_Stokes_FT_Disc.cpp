@@ -4046,13 +4046,14 @@ void Navier_Stokes_FT_Disc::compute_eulerian_field_contact_forces
   // XXX debug files
   std::ofstream f;
   std::string path;
-  for(int i=0; i<particles_position.dimension(0); i++)
-    {
-      path = fichier_debug + "_" + std::to_string(i)+".txt";
-      f.open(path, std::ios::app);
-      f<<schema_temps().temps_courant()<<" "<<particles_position(i,0)<<" "<<particles_position(i,1)<<" "<<particles_position(i,2)<<"\n";
-      f.close();
-    }
+  if(Process::me()==0)
+    for(int i=0; i<particles_position.dimension(0); i++)
+      {
+        path = fichier_debug + "_" + std::to_string(i)+".txt";
+        f.open(path, std::ios::app);
+        f<<schema_temps().temps_courant()<<" "<<particles_position(i,0)<<" "<<particles_position(i,1)<<" "<<particles_position(i,2)<<"\n";
+        f.close();
+      }
 
 
   // Step 3: conservation of eulerian id number

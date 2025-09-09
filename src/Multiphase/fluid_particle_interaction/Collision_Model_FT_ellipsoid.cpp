@@ -283,7 +283,7 @@ void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, 
     }
   for (int d = 0; d < dimension; ++d)
     {
-      dX(d) = -dX_min(d);
+      dX(d) = dX_min(d);
     }
   assert(i_closest >= 0);
   assert(j_closest >= 0);
@@ -316,7 +316,6 @@ void Collision_Model_FT_ellipsoid::normal_average_ij(Maillage_FT_Disc const& mes
 
   if(i_facet)
     {
-      std::cout<<"a\n";
       for(int d = 0; d<dimension; ++d) {ni(d) = nfacets(i_closest,d);}
     }
   else //the deepest point is the node -> the normal at the node is the average of the normal of the incident facets
@@ -387,11 +386,12 @@ void Collision_Model_FT_ellipsoid::compute_dX_dU_normal(DoubleTab& dX, DoubleTab
     {
       bool check_cg = true;
       int i_closest, j_closest;
-      bool i_facet, j_facet;
+      bool i_facet = false, j_facet=false;
       if(collision_detection_==Collision_detection::CLOSEST)
         {
           closest_nodes(compo_sommets, mesh, particle, neighbor, particles_position ,dX, i_closest, j_closest, false, i_facet, j_facet); //check_cg not implemented
         }
+
       if(collision_detection_==Collision_detection::DEEPEST)
         {
           deepest_points(compo_sommets,sommets_facets,mesh,particle, neighbor, particles_position, check_cg, dX, i_closest, j_closest, i_facet, j_facet);
@@ -448,7 +448,7 @@ void Collision_Model_FT_ellipsoid::compute_dX_dU_normal(DoubleTab& dX, DoubleTab
     }
   else
     {
-
+      if(sommets.dimension(0)==0) {return;}
       int ind_wall = neighbor - nb_particles_tot_;
       int ori = ind_wall < dimension ? ind_wall : ind_wall - dimension;
       double dX_min =  std::numeric_limits<double>::max();
@@ -485,14 +485,11 @@ double compute_det_M33(const Matrice_Dense& M)
 }
 
 void Collision_Model_FT_ellipsoid::compute_inertia_tensor(const Maillage_FT_Disc& mesh, int ind_particle_i,
-                                                          const DoubleTab& particles_position, Matrice_Dense& J, double& volume, double density)
+                                                          const DoubleTab& particles_position, const IntLists& compo_connexe_facets, Matrice_Dense& J, double& volume, double density)
 {
-
 
   const DoubleTab& sommets = mesh.sommets();
   const IntTab& facets = mesh.facettes();
-  IntLists compo_connexe_facets;
-  connec_compo_facettes(mesh, compo_connexe_facets);
   int nb_facets = compo_connexe_facets[ind_particle_i].size();
 
 
@@ -617,13 +614,19 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   connec_compo_sommets(mesh, compo_sommets);
   IntLists sommets_facets; //compo_sommet[i] contient les indices des sommets composant la compo i
   connec_sommets_fa7(mesh, sommets_facets);
-
+  IntLists compo_connexe_facets; //compo_connexes_fa7(fa7) donne l'indice de la compo (particule) contenant la facette fa7
+  connec_compo_facettes(mesh, compo_connexe_facets);
   for (int ind_particle_i = 0; ind_particle_i < nb_real_particles_; ind_particle_i++)
     {
       int particle_i=get_particle_i(ind_particle_i);
       int nb_particles_j=get_nb_particles_j(ind_particle_i);
       int ind_start_part_j=get_ind_start_particles_j(ind_particle_i);
+      if(compo_sommets[ind_particle_i].size()==0)continue;
 
+      Matrice_Dense Ji(dimension, dimension);
+      DoubleTab ri(dimension);
+      DoubleTab Omega_i(dimension);
+      DoubleTab tangential_force_contact(dimension);
       for (int ind_particle_j =ind_start_part_j; ind_particle_j < nb_particles_j; ind_particle_j++)
         {
           dX = 0;
@@ -633,38 +636,52 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           int is_particle_particle_collision = particle_j < nb_particles_tot_;
           compute_dX_dU_normal(dX, dU, norm, collision_point, particle_i, particle_j, particles_position,
                                particles_velocity, particles_rot_velocity, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
+          std::ofstream ffn, fft, fm, fu, fd;
+          std::string path;
+          path = fichier_debug + "normal_force_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
+          ffn.open(path, std::ios::app);
+          path = fichier_debug + "tangent_force_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
+          fft.open(path, std::ios::app);
+          path = fichier_debug + "moment_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
+          fm.open(path, std::ios::app);
+          path = fichier_debug + "vitesse_impact_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
+          fu.open(path, std::ios::app);
+          path = fichier_debug + "distance_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
+          fd.open(path, std::ios::app);
           std::ofstream f_cp;
           // XXX debug files
           std::ofstream f;
-          std::string path;
-          path = fichier_debug + "_" + std::to_string(particle_i)+".txt";
+          path = fichier_debug + "_closest_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
           f_cp.open(path, std::ios::app);
           if(particle_j - nb_particles_tot_==1) //ground
             f_cp<<t<<" "<<collision_point(0)<<" "<<collision_point(1)<<" "<<collision_point(2)<<"\n";
           f_cp.close();
 
-          double dist_gravity_center = sqrt(local_carre_norme_vect(dX));
+
+          double dist_gravity_center = sqrt(local_carre_norme_vect(dX));//project on normal ?? XXX
           double dist_between_particles = 0.;
           if(is_particle_particle_collision)
             {
-              dist_between_particles = local_prodscal(dX,norm);
+              dist_between_particles = -local_prodscal(dX,norm); //normal penetration distance
             }
           else
             {
               dist_between_particles = dist_gravity_center - activation_distance_ ;
             }
           F_now_(particle_i, particle_j) = 0;
-
+          double max_dist = 0.;
           if (dist_between_particles <= 0) // contact
             {
+              max_dist = std::max(max_dist, -dist_between_particles);
+
               if(is_particle_particle_collision) {dist_between_particles*=-1;}
               add_collision(particle_i,particle_j,is_particle_particle_collision);
 
-
-              double dX_scal_dU = local_prodscal(dX,dU) / (dist_gravity_center>0 ? dist_gravity_center : 1);
+              // double dX_scal_dU = local_prodscal(dX,dU) / (dist_gravity_center>0 ? dist_gravity_center : 1);
+              double dU_scal_norm = local_prodscal(dU,norm);
               DoubleTab dUn(dimension);
               for (int d = 0; d < dimension; d++)
-                dUn(d) = dX_scal_dU * norm(d);
+                dUn(d) = dU_scal_norm * norm(d);
 
               const double impact_velocity = sqrt(local_carre_norme_vect(dUn));
 
@@ -673,25 +690,26 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                                           F_old_(particle_i, particle_j); // We need to know
               // if this is the first time step of the collision to compute the impact velocity
 
-              DoubleTab next_dX(dimension);
-              for (int d = 0; d < dimension; d++)
-                next_dX(d) = dX(d) + deltat_simu * dU(d);
+              // DoubleTab next_dX(dimension);
+              // for (int d = 0; d < dimension; d++)
+              //   next_dX(d) = dX(d) + deltat_simu * dU(d);
               const double effective_radius = is_particle_particle_collision ? solid_particle.get_equivalent_radius()/2 :
                                               solid_particle.get_equivalent_radius();
               const double impact_Stokes = solid_density * 2 * effective_radius * impact_velocity /
                                            (9 * fluid_viscosity);
               if (is_start_of_collision)
-                e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes)/*/compute_ewet_legendre(impact_Stokes)*/;
+                e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes);
               DoubleTab force_contact=compute_contact_force(
                                         dist_between_particles,
                                         norm,
                                         dUn,
                                         particle_i,
                                         particle_j,
-                                        dX_scal_dU<=0,
+                                        dU_scal_norm<=0,
                                         is_particle_particle_collision);
 
-
+              ffn<<"Proc "<<Process::me()<<" "<<t<<" "<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
+              fu<<"Proc "<<Process::me()<<" "<<t<<" "<<dUn(0)<<" "<<dUn(1)<<" "<<dUn(2)<<" "<<impact_velocity<<"\n";
               for(int d=0; d<dimension; ++d)
                 {
                   dUt(d) = dU(d) - dUn(d);
@@ -701,25 +719,28 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               for(int d=0; d<dimension; ++d)
                 {
                   tang(d) = dUt(d)/dUt_norm;
-                  dUt(d)*=deltat_simu;
                 }
-              double tangential_displacement = sqrt(local_carre_norme_vect(dUt));
+              double tangential_displacement = sqrt(local_carre_norme_vect(dUt)) * deltat_simu;
+              if (is_start_of_collision)
+                e_eff_t(particle_i,particle_j)=0.39*compute_ewet_legendre(impact_Stokes); //XXX 0.39 comes from Jain 2019. Has to be a .data parameter
 
-              DoubleTab tangential_force_contact = compute_tangential_contact_force(tangential_displacement, tang, friction_coef, force_contact, is_particle_particle_collision);
+              if(is_start_of_collision)
+                {
+                  tangential_force_contact = 0.;
+                }
+              compute_tangential_contact_force(tangential_displacement, tang, e_eff_t(particle_i,particle_j), friction_coef, force_contact, dU_scal_norm<=0, is_particle_particle_collision,tangential_force_contact);
               for(int d=0; d<dimension; ++d)
                 {
                   force_contact(d) += tangential_force_contact(d);
                 }
+              fft<<"Proc "<<Process::me()<<" "<<t<<" "<<tangential_force_contact(0)<<" "<<tangential_force_contact(1)<<" "<<tangential_force_contact(2)<<"\n";
 
 
-              Matrice_Dense Ji(dimension, dimension);
+
               Matrice_Dense Jj(dimension, dimension);
-              DoubleTab ri(dimension);
               DoubleTab rj(dimension);
-              DoubleTab Omega_i(dimension);
               DoubleTab Omega_j(dimension);
-
-              compute_inertia_tensor(mesh, particle_i, particles_position, Ji, Vi, density);
+              compute_inertia_tensor(mesh, particle_i, particles_position,compo_connexe_facets, Ji, Vi, density);
               for(int d=0; d<dimension; ++d)
                 {
                   ri(d) = collision_point(d) - particles_position(particle_i,d) ;
@@ -729,15 +750,17 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                   rj(d) = collision_point(d) - particles_position(particle_j,d);
                   Omega_j(d) = particles_rot_velocity(particle_j,d);
                 }
-              DoubleTab moment_contact_i=compute_contact_moment(Ji,force_contact, ri, particles_rot_velocity);
+              DoubleTab moment_contact_i=compute_contact_moment(Ji,force_contact, ri, Omega_i);
               DoubleTab moment_contact_j(dimension);
               if(is_particle_particle_collision)
                 {
-                  compute_inertia_tensor(mesh, particle_j, particles_position, Jj, Vj, density);
-                  moment_contact_j=compute_contact_moment(Jj,force_contact, rj, particles_rot_velocity);
+                  compute_inertia_tensor(mesh, particle_j, particles_position,compo_connexe_facets, Jj, Vj, density);
+                  moment_contact_j=compute_contact_moment(Jj,force_contact, rj, Omega_j);
                 }
-
-
+              fm<<"Proc "<<Process::me()<<" "<<t<<" "<<moment_contact_i(0)<<" "<<moment_contact_i(1)<<" "<<moment_contact_i(2)<<"\n";
+              ffn.close();
+              fft.close();
+              fm.close();
               for (int d = 0; d < dimension; d++)
                 {
                   lagrangian_contact_forces_(particle_i, d) += fabs(force_contact(d)) <=
@@ -754,7 +777,23 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
               F_old_(particle_i, particle_j) = F_now_(particle_i, particle_j);
             }
+          if(particle_j - nb_particles_tot_==1) //ground
+            fd<<"Proc "<<Process::me()<<" "<<t<<" "<<max_dist<<"\n";
+
         }
+      //XXX debug file, energy
+      DoubleTab v(dimension), om(dimension);
+      DoubleTab InertiaOmega(dimension);
+      for(int d=0; d<dimension; ++d) {v(d) = particles_velocity(particle_i,d); om(d) = particles_rot_velocity(particle_i,d);}
+      Ji.ajouter_multvect_(om,InertiaOmega);
+      double energy = 9.81 * solid_particle.get_mass() * particles_position(particle_i,1) +
+                      0.5 * solid_particle.get_mass() * local_carre_norme_vect(v) +
+                      0.5 * local_carre_norme_vect(InertiaOmega);
+      std::string path;
+      std::fstream f;
+      path = fichier_debug + "_energy_" + std::to_string(particle_i)+".txt";
+      f.open(path, std::ios::app);
+      f<<t<<" "<<energy<<"\n";
     }
 
   if (detection_method_==Detection_method::LC_VERLET)
@@ -769,8 +808,9 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
     }
   t+=deltat_simu;
 }
-
-DoubleTab Collision_Model_FT_ellipsoid::compute_contact_moment(Matrice_Dense& Inertia, DoubleTab const& force, DoubleTab const& r, DoubleTab const& Omega)
+//XXX Inertia not a ref to debug only
+DoubleTab Collision_Model_FT_ellipsoid::compute_contact_moment(Matrice_Dense Inertia, DoubleTab const& force, DoubleTab const& r, DoubleTab const& Omega)
+// DoubleTab Collision_Model_FT_ellipsoid::compute_contact_moment(Matrice_Dense& Inertia, DoubleTab const& force, DoubleTab const& r, DoubleTab const& Omega)
 {
   DoubleTab contact_moment(dimension);
   DoubleTab temp(dimension);
@@ -793,11 +833,14 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   const DoubleTab& particles_position,
   DoubleTab& contact_force_source_term)
 {
+  static int t=0;
   const DoubleVect& interlaced_volumes=domain_vf.volumes_entrelaces();
   const DoubleTab& cg_faces=domain_vf.xv();
   const int nb_faces=interlaced_volumes.size_array();
   const IntVect& orientation = domain_vf.orientation();
   const IntTab& face_voisins=domain_vf.face_voisins();
+  double max_force = 0.;
+  double max_moment = 0.;
   for (int face=0; face<nb_faces; face++)
     {
       const int left_elem=face_voisins(face,0);
@@ -808,11 +851,20 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
       if (id_number!=-1)
         {
           const int ori=orientation(face);
+          max_force = std::max(max_force, std::fabs((1 - volumic_phase_indicator_function(face)) * interlaced_volumes(face) * (lagrangian_contact_forces_(id_number, ori))));
+          max_moment = std::max(max_moment, std::fabs((1 - volumic_phase_indicator_function(face)) * interlaced_volumes(face) *
+                                                      (lagrangian_contact_moments_(id_number, (ori + 1) % 3) * (cg_faces(face, (ori + 2) % 3) - particles_position(id_number, (ori + 2) % 3)) -
+                                                       lagrangian_contact_moments_(id_number, (ori + 2) % 3) * (cg_faces(face, (ori + 1) % 3) - particles_position(id_number, (ori + 1) % 3)))));
           contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
                                           *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori)
                                                                      + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
                                                                         lagrangian_contact_moments_(id_number,(ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) ))) ;
         }
     }
+  std::ofstream f,g;
+  f.open("check_energy_files/max_force.txt", std::ios::app);
+  g.open("check_energy_files/max_moment.txt", std::ios::app);
+  f<<t<<" "<<max_force<<"\n";
+  g<<t++<<" "<<max_moment<<"\n";
 }
 

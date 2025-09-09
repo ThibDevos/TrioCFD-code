@@ -62,6 +62,7 @@ void Collision_Model_FT_sphere::compute_lagrangian_contact_forces(const Fluide_D
   collision_number_=0;
   particles_collision_number_=0;
 
+  // XXX fin tests mpi
   for (int ind_particle_i = 0; ind_particle_i < nb_real_particles_; ind_particle_i++)
     {
       int particle_i=get_particle_i(ind_particle_i);
@@ -129,11 +130,23 @@ void Collision_Model_FT_sphere::compute_lagrangian_contact_forces(const Fluide_D
                   lagrangian_contact_forces_(particle_j, d) -= fabs(force_contact(d)) <=
                                                                min_threshold ? 0 :  force_contact(d) / volume_sphere;
                 }
-              t+=deltat_simu;
+
             }
           F_old_(particle_i, particle_j) = F_now_(particle_i, particle_j);
         }
+      //XXX debug file, energy
+      DoubleTab v(dimension);
+      for(int d=0; d<dimension; ++d) {v(d) = particles_velocity(particle_i,d);}
+      double energy = 9.81 * solid_particle.get_mass() * particles_position(particle_i,1) +
+                      0.5 * solid_particle.get_mass() * local_carre_norme_vect(v);
+      std::string path;
+      std::fstream f;
+      path =  "modele_sphere_files/sphere_energy_" + std::to_string(particle_i)+".txt";
+      f.open(path, std::ios::app);
+      f<<t<<" "<<energy<<"\n";
+      t+=deltat_simu;
     }
+
 
   if (detection_method_==Detection_method::LC_VERLET)
     {

@@ -95,8 +95,9 @@ public:
     const int& particle_j,
     const int& is_compression_step,
     const double& is_collision_part_part);
-  DoubleTab compute_tangential_contact_force(double tangential_displacement, DoubleTab const& tang,
-                                             double friction_coef, DoubleTab const& normal_force, const double& is_collision_part_part);
+  void compute_tangential_contact_force(double tangential_displacement, DoubleTab const& tang, double e,
+                                        double friction_coef, DoubleTab const& normal_force, const int& is_compression_step, const double& is_collision_part_part,
+                                        DoubleTab& tangential_force_contact);
 
   double compute_ewet_legendre(const double& St) {return exp(-35 / (St + 1e-6));} // See: D. Legendre et al, Chem. Eng. Sci., (2006).
 
@@ -173,6 +174,7 @@ protected:
 
   DoubleTab particles_collision_number_;
   DoubleTab e_eff_; // effective restitution coefficient
+  DoubleTab e_eff_t; // effective tangential restitution coefficient
   DoubleTab F_old_;
   DoubleTab F_now_;
   DoubleTab lagrangian_contact_forces_;
@@ -202,7 +204,9 @@ protected:
   int nb_real_particles_; // = nb_particles_tot_ for CHECK_ALL and VERLET
 
   double stiffness_breugem_part_part_ = 0;
+  double stiffness_breugem_part_part_tangent = 0;
   double stiffness_breugem_wall_part_ = 0;
+  double stiffness_breugem_wall_part_tangent = 0;
   double damper_breugem_part_part_ = 0;
   double damper_breugem_wall_part_ = 0;
 
