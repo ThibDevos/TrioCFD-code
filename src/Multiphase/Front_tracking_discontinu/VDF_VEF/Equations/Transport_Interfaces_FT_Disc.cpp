@@ -9732,7 +9732,6 @@ void Transport_Interfaces_FT_Disc::compute_inertia_tensors(const Maillage_FT_Dis
         }
       mp_sum_for_each_item(J);
       particles_volume_(compo) = Process::mp_sum(V);
-      std::cout<<V<<" "<<particles_volume_(compo)<<" blop"<<std::endl;
       for (int i = 0; i < dimension; ++i)
         {
           for (int j = 0; j < dimension; ++j)

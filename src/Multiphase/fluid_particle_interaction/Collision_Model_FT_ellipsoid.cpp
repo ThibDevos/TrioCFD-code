@@ -256,7 +256,8 @@ void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, 
     }
   else
     {
-      std::cout<<compo_sommets[particle].size()<<" vs "<<compo_sommets[neighbor].size()<<std::endl;
+      std::cout<<"["<<Process::me()<<"] : "<<"Particule "<<particle <<" compare with particle "<<neighbor<<std::endl;
+      std::cout<<"["<<Process::me()<<"] : "<<compo_sommets[particle].size()<<" vs "<<compo_sommets[neighbor].size()<<std::endl;
       double dX_min_norm = sqrt(local_carre_norme_vect(dX_min));
       for (int i = 0; i < compo_sommets[particle].size(); ++i)
         {
@@ -546,7 +547,6 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           std::cout<<std::endl;
         }
 
-      std::cout<<"["<<Process::me()<<"] : "<<"Particule "<<ind_particle_i;
       for (int ind_particle_j =ind_start_part_j; ind_particle_j < nb_particles_j; ind_particle_j++)
         {
           dX = 0;
@@ -554,10 +554,10 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           norm = 0;
           int particle_j=get_particle_j(ind_particle_i,ind_particle_j);
           int is_particle_particle_collision = particle_j < nb_particles_tot_;
-          std::cout<<"["<<Process::me()<<"] : "<<" compare with particle "<<particle_j<<" which is "<<is_particle_particle_collision<<" particle particle collisions"<<std::endl;
+
           compute_dX_dU_normal(dX, dU, norm, collision_point, particle_i, particle_j, particles_position,
                                particles_velocity, particles_rot_velocity, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
-          std::cout<<"["<<Process::me()<<"] : "<<"finished compute dx du normal"<<std::endl;
+          std::cout<<"["<<Process::me()<<"] : "<<"finished compute dx du normal "<<is_particle_particle_collision<<std::endl;
           std::ofstream ffn, fft, fm, fu, fd;
           std::string path;
           path = fichier_debug + "normal_force_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
@@ -594,6 +594,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           double max_dist = 0.;
           if (dist_between_particles <= 0) // contact
             {
+              std::cout<<"["<<Process::me()<<"] : "<<"Collision detected !!!!"<<std::endl;
               max_dist = std::max(max_dist, -dist_between_particles);
 
               if(is_particle_particle_collision) {dist_between_particles*=-1;}
@@ -725,7 +726,6 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
       f.open(path, std::ios::app);
       f<<t<<" "<<energy<<"\n";
     }
-
   // if (detection_method_==Detection_method::LC_VERLET)
   //   {
   mp_sum_for_each_item(lagrangian_contact_forces_);
