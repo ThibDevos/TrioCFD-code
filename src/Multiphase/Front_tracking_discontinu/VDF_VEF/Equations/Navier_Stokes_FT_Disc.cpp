@@ -38,6 +38,7 @@
 #include <Connex_components.h>
 #include <EcritureLectureSpecial.h>
 #include <Avanc.h>
+#include <particle_properties.h>
 
 
 #define NS_VERBOSE 0 // To activate verbose mode on err ...
@@ -4022,8 +4023,11 @@ void Navier_Stokes_FT_Disc::compute_eulerian_field_contact_forces
   const DoubleTab& particles_position=eq_transport.get_particles_position();
   const DoubleTab& particles_velocity=eq_transport.get_particles_velocity();
   const DoubleTab& particles_rot_velocity=eq_transport.get_particles_rot_velocity();
+  const DoubleTab& particles_inertia_tensors=eq_transport.get_particles_inertia_tensor();
+  const DoubleTab& volume=eq_transport.get_particles_volume();
   const Fluide_Diphasique& two_phase_fluid = fluide_diphasique();
 
+  const particle_properties part_prop(particles_position,particles_velocity,particles_rot_velocity,particles_inertia_tensors, volume);
   // Step 1: Collision detection
   //const ArrOfInt& gravity_center_elem = eq_transport.get_gravity_center_elem();
   int& nb_dt_Verlet = collision_model.get_set_nb_dt_Verlet();
@@ -4038,9 +4042,7 @@ void Navier_Stokes_FT_Disc::compute_eulerian_field_contact_forces
     }
   // Step 2: Contact forces computation
   collision_model.compute_lagrangian_contact_forces(two_phase_fluid,
-                                                    particles_position,
-                                                    particles_velocity,
-                                                    particles_rot_velocity,
+                                                    part_prop,
                                                     delta_t,
                                                     mesh);
   // XXX debug files

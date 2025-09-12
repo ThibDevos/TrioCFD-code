@@ -37,7 +37,7 @@ class Collision_Model_FT_ellipsoid : public Collision_Model_FT_base
   Declare_instanciable_sans_constructeur(Collision_Model_FT_ellipsoid);
 
 public:
-
+  void test_connex_compo(Maillage_FT_Disc const& maillage);
   Collision_Model_FT_ellipsoid();
   int lire_motcle_non_standard(const Motcle&, Entree&) override;
   int preparer_calcul(const Domaine_VDF& domain_vdf,
@@ -58,10 +58,12 @@ public:
                             const IntLists& compo_sommets, const IntLists& sommets_facets, const Maillage_FT_Disc& mesh);
 
 
-  void compute_inertia_tensor(const Maillage_FT_Disc& mesh, int ind_particle_i,
-                              const DoubleTab& particles_position, const IntLists& compo_connexe_facets, Matrice_Dense& J, double& volume, double density);
-  DoubleTab compute_contact_moment(Matrice_Dense Inertia, DoubleTab const& force, DoubleTab const& contact_point, DoubleTab const& Omega);
 
+  DoubleTab compute_contact_moment(Matrice_Dense Inertia, DoubleTab const& force, DoubleTab const& contact_point, DoubleTab const& Omega);
+  virtual void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
+                                                 const particle_properties& part_prop,
+                                                 const double& deltat_simu,
+                                                 const Maillage_FT_Disc& mesh) override;
   void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                          const DoubleTab& particles_position,
                                          const DoubleTab& particles_velocity,

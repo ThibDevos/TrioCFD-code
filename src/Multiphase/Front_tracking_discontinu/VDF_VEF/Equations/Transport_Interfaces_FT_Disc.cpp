@@ -7028,6 +7028,7 @@ void Transport_Interfaces_FT_Disc::calculer_vitesse_repere_local(const Maillage_
   calculer_vmoy_composantes_connexes(maillage, compo_connexe_facettes, nb_compo_tot,
                                      deplacement, Vitesses, Positions);
   calculer_vitesses_rotation(maillage, compo_connec_sommets, compo_connec_facet, nb_compo_tot, deplacement, Vitesses, Omega, Positions);
+  compute_inertia_tensors(maillage, nb_compo_tot, Positions);
   std::ofstream f;
   std::string path;
   std::string file="positions/rotation";
@@ -8257,6 +8258,8 @@ int Transport_Interfaces_FT_Disc::reprendre(Entree& is)
         particles_position_collision_.resize(0,dimension);
         particles_velocity_collision_.resize(0,dimension);
         particles_rot_velocity_collision_.resize(0,dimension);
+        particles_inertia_tensor_collision_.resize(0,dimension,dimension);
+        particles_volume_.resize(0);
         const int format_xyz = EcritureLectureSpecial::is_lecture_special();
         if (format_xyz)
           {
@@ -8269,6 +8272,12 @@ int Transport_Interfaces_FT_Disc::reprendre(Entree& is)
             for (int i=0; i<particles_rot_velocity_collision_.dimension(0); i++)
               for (int j=0; j<particles_rot_velocity_collision_.dimension(1); j++)
                 is>>particles_rot_velocity_collision_(i,j);
+            for (int i=0; i<particles_inertia_tensor_collision_.dimension(0); i++)
+              for (int j=0; j<particles_inertia_tensor_collision_.dimension(1); j++)
+                for (int k=0; k<particles_inertia_tensor_collision_.dimension(1); k++)
+                  is>>particles_inertia_tensor_collision_(i,j,k);
+            for (int i=0; i<particles_volume_.dimension(0); i++)
+              is>>particles_volume_(i);
             return 1;
           }
         else if (TRUST_2_PDI::is_PDI_restart())
@@ -8281,6 +8290,8 @@ int Transport_Interfaces_FT_Disc::reprendre(Entree& is)
             is >> particles_position_collision_;
             is >> particles_velocity_collision_;
             is >> particles_rot_velocity_collision_;
+            is >> particles_inertia_tensor_collision_;
+            is >> particles_volume_;
           }
         const Domaine& domain = domaine_dis().domaine();
         domain.chercher_elements(particles_position_collision_, gravity_center_elem_);
@@ -9601,6 +9612,137 @@ void Transport_Interfaces_FT_Disc::calculer_vitesses_rotation(const Maillage_FT_
   particles_rot_velocity_collision_ = Omega;
 }
 
+
+//Only for 3x3 matrices
+double compute_det_M33(const Matrice_Dense& M)
+{
+  return M(0,0) * M(1,1) * M(2,2) + M(1,0) * M(2,1) * M(0,2) + M(0,1) * M(1,2) * M(2,0)
+         - ( M(2,0) * M(1,1) * M(0,2) + M(1,0) * M(0,1) * M(2,2) + M(0,0) * M(2,1) * M(1,2) );
+
+}
+/*
+ Compute the inertia tensors of the particles. Uses a tetrahedrisation of the discrete particle and integrates
+ over the tetrahedra using a reference tetrahedron \hat{T} and the mapping M : x \in \hat{T} -> T_K x + b_K \in T
+ XXX loops on the facets. Could be integrated in calculer_vmoy_composantes_connexes() for performance
+ XXX the density should multiply the tensor. I don't know how to access to it from here.
+*/
+void Transport_Interfaces_FT_Disc::compute_inertia_tensors(const Maillage_FT_Disc& maillage, int nb_compo_tot, const DoubleTab& Positions) const
+{
+  // Prepare Gauss quadrature (5 points is a bit too much for quadratics)
+  DoubleTab points(5, 3);
+  DoubleTab poids(5);
+
+  points(0, 0) = 0.25;
+  points(0, 1) = 0.25;
+  points(0, 2) = 0.25;
+  poids(0) = -4. / 30.;
+
+  points(1, 0) = 1. / 6.;
+  points(1, 1) = 1. / 6.;
+  points(1, 2) = 1. / 6.;
+  poids(1) = 9. / 120.;
+
+  points(2, 0) = 1. / 2.;
+  points(2, 1) = 1. / 6.;
+  points(2, 2) = 1. / 6.;
+  poids(2) = 9. / 120.;
+
+  points(3, 0) = 1. / 6.;
+  points(3, 1) = 1. / 2.;
+  points(3, 2) = 1. / 6.;
+  poids(3) = 9. / 120.;
+
+  points(4, 0) = 1. / 6.;
+  points(4, 1) = 1. / 6.;
+  points(4, 2) = 1. / 2.;
+  poids(4) = 9. / 120.;
+
+  IntLists compo_connexe_facets; // compo_connexes_fa7(fa7) donne l'indice de la compo (particule) contenant la facette fa7
+  connec_compo_facettes(maillage, compo_connexe_facets);
+
+  const DoubleTab& sommets = maillage.sommets();
+  const IntTab& facets = maillage.facettes();
+
+  DoubleTab J(dimension, dimension);
+  DoubleTab b_K(dimension);
+  double V = 0.;
+
+  for (int compo = 0; compo < nb_compo_tot; ++compo)
+    {
+      int nb_facets = compo_connexe_facets[compo].size();
+      J = 0.;
+      b_K = 0.;
+      V = 0.;
+      for (int d = 0; d < dimension; ++d)
+        {
+          b_K(d) = Positions(compo, d);
+        }
+      for (int f = 0; f < nb_facets; ++f)
+        {
+          int f_global = compo_connexe_facets[compo][f];
+          if (!maillage.facette_virtuelle(f_global))
+            {
+              Matrice_Dense T_K(dimension, dimension);
+              Matrice_Dense J_loc(dimension, dimension);
+              J_loc.clean();
+              for (int i = 0; i < 3; ++i)
+                {
+                  for (int j = 0; j < 3; ++j)
+                    {
+                      T_K(i, j) = sommets(facets(f_global, j), i) - b_K(i);
+                    }
+                }
+              double det_T_K = std::fabs(compute_det_M33(T_K));
+              V += det_T_K;
+
+              DoubleTab x_q(dimension);
+              DoubleTab point(dimension);
+              for (int q = 0; q < 5; ++q)
+                {
+                  for (int d = 0; d < dimension; ++d)
+                    {
+                      point(d) = points(q, d);
+                      x_q(d) = b_K(d);
+                    }
+                  for (int i = 0; i < dimension; ++i)
+                    {
+                      for (int j = 0; j < dimension; ++j)
+                        {
+                          x_q(i) += T_K(i, j) * point(j);
+                        }
+                    }
+                  for (int i = 0; i < dimension; ++i)
+                    {
+                      J_loc(i, i) += ((x_q((i + 1) % 3) - b_K((i + 1) % 3)) * (x_q((i + 1) % 3) - b_K((i + 1) % 3)) + (x_q((i + 2) % 3) - b_K((i + 2) % 3)) * (x_q((i + 2) % 3) - b_K((i + 2) % 3))) * poids(q);
+                      for (int j = i + 1; j < dimension; ++j)
+                        {
+                          J_loc(i, j) += -(x_q(i) - b_K(i)) * (x_q(j) - b_K(j)) * poids(q);
+                          J_loc(j, i) = J_loc(i, j);
+                        }
+                    }
+                }
+              for (int i = 0; i < dimension; ++i)
+                {
+                  for (int j = 0; j < dimension; ++j)
+                    {
+                      J(i, j) += det_T_K * J_loc(i, j);
+                    }
+                }
+            }
+        }
+      mp_sum_for_each_item(J);
+      particles_volume_(compo) = Process::mp_sum(V);
+      std::cout<<V<<" "<<particles_volume_(compo)<<" blop"<<std::endl;
+      for (int i = 0; i < dimension; ++i)
+        {
+          for (int j = 0; j < dimension; ++j)
+            {
+              particles_inertia_tensor_collision_(compo, i, j) = J(i, j);
+            }
+        }
+    }
+}
+
 void Transport_Interfaces_FT_Disc::ramasse_miettes(const Maillage_FT_Disc& maillage,
                                                    DoubleVect& flux,
                                                    DoubleVect& valeurs)
@@ -9839,9 +9981,13 @@ void Transport_Interfaces_FT_Disc::init_particles_position_velocity()
       particles_position_collision_.resize(nb_particles_tot, dimension);
       particles_velocity_collision_.resize(nb_particles_tot, dimension);
       particles_rot_velocity_collision_.resize(nb_particles_tot, dimension);
+      particles_inertia_tensor_collision_.resize(nb_particles_tot, dimension, dimension);
+      particles_volume_.resize(nb_particles_tot);
       particles_position_collision_ = 0.;
       particles_velocity_collision_ = 0;
       particles_rot_velocity_collision_ = 0;
+      particles_inertia_tensor_collision_ = 0;
+      particles_volume_ = 0;
 
       const ArrOfDouble& surface_facettes = mesh.get_update_surface_facettes();
       const IntTab& facettes = mesh.facettes();
@@ -9909,6 +10055,8 @@ void Transport_Interfaces_FT_Disc::swap_particles_lagrangian_position_velocity()
   DoubleTab correct_particles_position(nb_particles_tot, dimension);
   DoubleTab correct_particles_velocity(nb_particles_tot, dimension);
   DoubleTab correct_particles_rot_velocity(nb_particles_tot, dimension);
+  DoubleTab correct_particles_inertia_tensor_collision_(nb_particles_tot, dimension);
+  DoubleTab correct_particles_volume_(nb_particles_tot);
   IntVect particles_correct_id_number(nb_particles_tot);
 
   // Step 1: Identification of the elements which contain particles gravity center
@@ -9933,16 +10081,23 @@ void Transport_Interfaces_FT_Disc::swap_particles_lagrangian_position_velocity()
   for (int wrong_id_number = 0; wrong_id_number < nb_particles_tot; wrong_id_number++)
     {
       int good_id_number = particles_correct_id_number[wrong_id_number];
+      correct_particles_volume_(good_id_number) = particles_volume_(wrong_id_number);
       for (int d = 0; d < dimension; d++)
         {
           correct_particles_position(good_id_number, d) = particles_position_collision_(wrong_id_number, d);
           correct_particles_velocity(good_id_number, d) = particles_velocity_collision_(wrong_id_number, d);
           correct_particles_rot_velocity(good_id_number, d) = particles_rot_velocity_collision_(wrong_id_number, d);
+          for(int dd=0; dd<dimension; ++dd)
+            {
+              correct_particles_inertia_tensor_collision_(good_id_number, d, dd) = particles_inertia_tensor_collision_(wrong_id_number, d, dd);
+            }
         }
     }
   particles_position_collision_ = correct_particles_position;
   particles_velocity_collision_ = correct_particles_velocity;
   particles_rot_velocity_collision_ = correct_particles_rot_velocity;
+  particles_inertia_tensor_collision_ = correct_particles_inertia_tensor_collision_;
+  particles_volume_ = correct_particles_volume_;
 }
 
 void Transport_Interfaces_FT_Disc::compute_particles_rms()

@@ -46,6 +46,14 @@ void Collision_Model_FT_spheroid::compute_lagrangian_contact_forces(const Fluide
   Process::exit("Collision_Model_FT_spheroid::compute_lagrangian_contact_forces not coded for "
                 "spheroid particles");
 }
+void Collision_Model_FT_spheroid::compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
+                                                                    const particle_properties& part_prop,
+                                                                    const double& deltat_simu,
+                                                                    const Maillage_FT_Disc& mesh)
+{
+  Process::exit("Collision_Model_FT_spheroid::compute_lagrangian_contact_forces not coded for "
+                "spheroid particles");
+}
 
 void Collision_Model_FT_spheroid::discretize_contact_forces_eulerian_field(
   const DoubleTab& volumic_phase_indicator_function,

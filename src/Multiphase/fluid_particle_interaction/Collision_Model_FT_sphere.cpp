@@ -35,6 +35,13 @@ Sortie& Collision_Model_FT_sphere::printOn(Sortie& os) const
   Process::exit();
   return os;
 }
+void Collision_Model_FT_sphere::compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
+                                                                  const particle_properties& part_prop,
+                                                                  const double& deltat_simu,
+                                                                  const Maillage_FT_Disc& mesh)
+{
+  compute_lagrangian_contact_forces(two_phase_fluid, part_prop.position, part_prop.velocity, part_prop.rot_velocity, deltat_simu, mesh);
+}
 
 void Collision_Model_FT_sphere::compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                                                   const DoubleTab& particles_position,

@@ -311,6 +311,8 @@ public:
   const DoubleTab& get_particles_position() const { return particles_position_collision_; }
   const DoubleTab& get_particles_velocity() const { return particles_velocity_collision_; }
   const DoubleTab& get_particles_rot_velocity() const { return particles_rot_velocity_collision_; }
+  const DoubleTab& get_particles_inertia_tensor() const { return particles_inertia_tensor_collision_; }
+  const DoubleTab& get_particles_volume() const { return particles_volume_; }
   const ArrOfInt& get_gravity_center_elem() const { return gravity_center_elem_; }
   Post_Processing_Hydrodynamic_Forces& get_post_process_hydro_forces()
   { return post_process_hydro_forces_; }
@@ -331,7 +333,7 @@ protected:
                                   int nb_compo_tot, const DoubleTab& vitesse_sommets,
                                   const DoubleTab& Vitesses, DoubleTab& Omega,
                                   const DoubleTab& Positions) const;
-
+  void compute_inertia_tensors(const Maillage_FT_Disc& maillage,int nb_compo_tot,const DoubleTab& Positions) const;
   void ajouter_contribution_saut_vitesse(DoubleTab& deplacement) const;
   virtual void deplacer_maillage_ft_v_fluide(const double temps);
 
@@ -420,6 +422,8 @@ protected:
   mutable DoubleTab particles_position_collision_; // for contact forces computation
   mutable DoubleTab particles_velocity_collision_; // for contact forces computation
   mutable DoubleTab particles_rot_velocity_collision_; // for contact forces computation
+  mutable DoubleTab particles_inertia_tensor_collision_; // for contact forces computation
+  mutable DoubleTab particles_volume_; // for contact forces computation
   mutable ArrOfInt gravity_center_elem_; // number of the element which contains the gravity center of the particles
   DoubleTab mean_particles_volumic_velocity_;
   DoubleTab mean_particles_volumic_squared_velocity_;

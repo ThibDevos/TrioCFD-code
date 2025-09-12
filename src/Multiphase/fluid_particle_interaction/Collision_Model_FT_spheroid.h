@@ -36,7 +36,10 @@ class Collision_Model_FT_spheroid : public Collision_Model_FT_base
 public:
 
   Collision_Model_FT_spheroid();
-
+  virtual void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
+                                                 const particle_properties& part_prop,
+                                                 const double& deltat_simu,
+                                                 const Maillage_FT_Disc& mesh) override;
   void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                          const DoubleTab& particles_position,
                                          const DoubleTab& particles_velocity,

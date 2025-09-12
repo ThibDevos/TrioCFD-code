@@ -13,6 +13,7 @@
 #include <TRUSTLists.h>
 #include <TRUST_Ref.h>
 #include <type_traits>
+#include <particle_properties.h>
 
 
 class Param;
@@ -64,6 +65,11 @@ public:
   void compute_dX_dU(DoubleTab& dX, DoubleTab& dU, const int& particle,\
                      const int& neighbor, const DoubleTab& particles_position, const\
                      DoubleTab& particles_velocity, const bool is_particle_particle_collision );
+
+  virtual void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
+                                                 const particle_properties& part_prop,
+                                                 const double& deltat_simu,
+                                                 const Maillage_FT_Disc& mesh)=0;
 
   virtual void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                                  const DoubleTab& particles_position,
