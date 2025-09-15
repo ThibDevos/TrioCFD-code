@@ -10054,7 +10054,7 @@ void Transport_Interfaces_FT_Disc::swap_particles_lagrangian_position_velocity()
   DoubleTab correct_particles_position(nb_particles_tot, dimension);
   DoubleTab correct_particles_velocity(nb_particles_tot, dimension);
   DoubleTab correct_particles_rot_velocity(nb_particles_tot, dimension);
-  DoubleTab correct_particles_inertia_tensor_collision_(nb_particles_tot, dimension);
+  DoubleTab correct_particles_inertia_tensor_collision_(nb_particles_tot, dimension, dimension);
   DoubleTab correct_particles_volume_(nb_particles_tot);
   IntVect particles_correct_id_number(nb_particles_tot);
 
