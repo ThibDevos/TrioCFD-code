@@ -717,14 +717,15 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
       DoubleTab InertiaOmega(dimension);
       for(int d=0; d<dimension; ++d) {v(d) = particles_velocity(particle_i,d); om(d) = particles_rot_velocity(particle_i,d);}
       Ji.ajouter_multvect_(om,InertiaOmega);
-      double energy = 9.81 * solid_particle.get_mass() * particles_position(particle_i,1) +
-                      0.5 * solid_particle.get_mass() * local_carre_norme_vect(v) +
-                      0.5 * local_carre_norme_vect(InertiaOmega);
+      double energy_potentielle = 9.81 * solid_particle.get_mass() * particles_position(particle_i,1);
+      double energy_cinetique = 0.5 * solid_particle.get_mass() * local_carre_norme_vect(v);
+      double energy_rotation = 0.5 * local_prodscal(InertiaOmega,om);
+      double energy = energy_potentielle + energy_cinetique + energy_rotation;
       std::string path;
       std::fstream f;
-      path = fichier_debug + "_energy_" + std::to_string(particle_i)+".txt";
+      path = fichier_debug + "energy_" + std::to_string(Process::me())+".txt";
       f.open(path, std::ios::app);
-      f<<t<<" "<<energy<<"\n";
+      f<<t<<" "<<energy<<" "<<energy_potentielle<<" "<<energy_cinetique<<" "<<energy_rotation<<"\n";
     }
   // if (detection_method_==Detection_method::LC_VERLET)
   //   {
