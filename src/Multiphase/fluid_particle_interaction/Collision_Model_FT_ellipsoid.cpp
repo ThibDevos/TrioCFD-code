@@ -489,7 +489,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                                                                      const double& deltat_simu,
                                                                      const Maillage_FT_Disc& mesh)
 {
-  static double t=0.;
+  static double t=part_prop.t;
   const int& id_fluid_phase= two_phase_fluid.get_id_fluid_phase();
   const int& id_solid_phase=1-id_fluid_phase;
   const auto& solid_particle=ref_cast(Solid_Particle_ellipsoid,two_phase_fluid.fluide_phase(id_solid_phase));
@@ -737,7 +737,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   mp_sum_for_each_item(particles_collision_number_);
   collision_number_=Process::check_int_overflow(Process::mp_sum(collision_number_));
   // }
-  t+=deltat_simu;
+  // t+=deltat_simu;
 }
 //XXX Inertia not a ref to debug only
 DoubleTab Collision_Model_FT_ellipsoid::compute_contact_moment(Matrice_Dense Inertia, DoubleTab const& force, DoubleTab const& r, DoubleTab const& Omega)
