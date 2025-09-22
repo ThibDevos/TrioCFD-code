@@ -57,7 +57,7 @@ public:
                             const int neighbor, const DoubleTab& particles_position, const DoubleTab& particles_velocity, const DoubleTab& particles_rot_velocity, const bool is_particle_particle_collision,
                             const IntLists& compo_sommets, const IntLists& sommets_facets, const Maillage_FT_Disc& mesh);
 
-
+  void output_orientation(const DoubleTab& particles_position, IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, int nb_compo, double t);
 
   DoubleTab compute_contact_moment(Matrice_Dense Inertia, DoubleTab const& force, DoubleTab const& contact_point, DoubleTab const& Omega);
   virtual void compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,

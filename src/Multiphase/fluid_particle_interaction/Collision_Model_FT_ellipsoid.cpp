@@ -489,7 +489,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                                                                      const double& deltat_simu,
                                                                      const Maillage_FT_Disc& mesh)
 {
-  static double t=part_prop.t;
+  double t=part_prop.t;
   const int& id_fluid_phase= two_phase_fluid.get_id_fluid_phase();
   const int& id_solid_phase=1-id_fluid_phase;
   const auto& solid_particle=ref_cast(Solid_Particle_ellipsoid,two_phase_fluid.fluide_phase(id_solid_phase));
@@ -736,8 +736,187 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   mp_max_for_each_item(e_eff_);
   mp_sum_for_each_item(particles_collision_number_);
   collision_number_=Process::check_int_overflow(Process::mp_sum(collision_number_));
+
+  // output_orientation(particles_position,compo_sommets, mesh,particles_position.dimension(0), t);
   // }
   // t+=deltat_simu;
+}
+
+void Collision_Model_FT_ellipsoid::output_orientation(const DoubleTab& particles_position, IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, int nb_compo, double t)
+{
+  auto const& sommets = mesh.sommets();
+  for(int compo = 0; compo<nb_compo; ++compo)
+    {
+      std::cout<<"compo : "<<compo<<std::endl;
+      static int further1=-1, further2=-1;
+      double d_further1=std::numeric_limits<double>::min(), d_further2=std::numeric_limits<double>::min();
+      static int closest1=-1, closest2=-1;
+      double d_closest1=std::numeric_limits<double>::max(), d_closest2=std::numeric_limits<double>::max();
+      DoubleTab X(dimension);
+      DoubleTab xs(dimension);
+      DoubleTab xf1(dimension), xf2(dimension), xc1(dimension), xc2(dimension);
+      for(int d=0; d<dimension; ++d) {X(d) = 0.*particles_position(compo, d);}
+      DoubleTab coord_f1(dimension +1);
+      DoubleTab coord_f2(dimension +1);
+      DoubleTab coord_c1(dimension +1);
+      DoubleTab coord_c2(dimension +1);
+
+      further1 = 0;
+      closest1 = 0;
+      for(int d=0; d<dimension; ++d) {xf1(d) = sommets(0, d) - X(d); xc1(d) = sommets(0, d) - X(d);}
+      d_further1 = sqrt(local_prodscal(xs, xs));
+      d_closest1 = sqrt(local_prodscal(xs, xs));
+      for (int i = 1; i < sommets.dimension(0); ++i)
+        // for (int i = 0; i < compo_sommets[compo].size(); ++i)
+        {
+          // int i_global = compo_sommets[compo][i];
+          int i_global = i;
+          for(int d=0; d<dimension; ++d) {xs(d) = sommets(i_global, d) - X(d);}
+
+          double dist = sqrt(local_prodscal(xs, xs));
+          if(dist>d_further2 && local_prodscal(xs,xf1) >= 0)
+            {
+              further2 = i_global;
+              d_further2=dist;
+              for(int d=0; d<dimension; ++d) {xf2(d) = xs(d);}
+            }
+          if (dist>d_further1 && i_global != further2)
+            {
+              further1 = i_global;
+              d_further1=dist;
+              for(int d=0; d<dimension; ++d) {xf1(d) = xs(d);}
+            }
+          else if (dist<d_closest2 && local_prodscal(xs,xc1) >= 0)
+            {
+              closest2 = i_global;
+              d_closest2=dist;
+              for(int d=0; d<dimension; ++d) {xc2(d) = xs(d);}
+            }
+          else if (dist<d_closest1 /*&& local_prodscal(xs,xc2) <= 0*/)
+            {
+              closest1 = i_global;
+              d_closest1=dist;
+              for(int d=0; d<dimension; ++d) {xc1(d) = xs(d);}
+            }
+        }
+      std::cout<<"d closest 1 : "<<d_closest1<<std::endl;
+      std::cout<<"d closest 2 : "<<d_closest2<<std::endl;
+      coord_f1(0) = d_further1;
+      coord_f2(0) = d_further2;
+      coord_c1(0) = d_closest1;
+      coord_c2(0) = d_closest2;
+
+      for(int d=0; d<dimension; ++d)
+        {
+          coord_f1(d+1) = sommets(further1, d);
+          coord_f2(d+1) = sommets(further2, d);
+          coord_c1(d+1) = sommets(closest1, d);
+          coord_c2(d+1) = sommets(closest2, d);
+        }
+      if(Process::is_parallel())
+        {
+          if(Process::me()!=0)
+            {
+              envoyer(coord_f1, Process::me(), 0, 100+1);
+              envoyer(coord_f2, Process::me(), 0, 100+2);
+              envoyer(coord_c1, Process::me(), 0, 100+3);
+              envoyer(coord_c2, Process::me(), 0, 100+4);
+            }
+          else
+            {
+              int nb_proc = Process::nproc();
+              DoubleTab coord_f1_list(nb_proc, dimension);
+              DoubleTab coord_f2_list(nb_proc, dimension);
+              DoubleTab coord_c1_list(nb_proc, dimension);
+              DoubleTab coord_c2_list(nb_proc, dimension);
+              double global_d_f1 = std::numeric_limits<double>::min();
+              double global_d_f2 = std::numeric_limits<double>::min();
+              double global_d_c1 = std::numeric_limits<double>::max();
+              double global_d_c2 = std::numeric_limits<double>::max();
+              int max_f1=-1, max_f2=-1, min_c1=-1, min_c2=-1;
+              for(int i=0; i<nb_proc; ++i)
+                {
+                  DoubleTab temp_f1(dimension+1), temp_f2(dimension+1), temp_c1(dimension+1), temp_c2(dimension+1);
+                  recevoir(temp_f1, i, 0, 100+1);
+                  recevoir(temp_f2, i, 0, 100+2);
+                  recevoir(temp_c1, i, 0, 100+3);
+                  recevoir(temp_c2, i, 0, 100+4);
+
+                  for(int d=0; d<dimension; ++d)
+                    {
+                      coord_f1_list(i,d) = temp_f1(d+1);
+                      coord_f2_list(i,d) = temp_f2(d+1);
+                      coord_c1_list(i,d) = temp_c1(d+1);
+                      coord_c2_list(i,d) = temp_c2(d+1);
+                    }
+                  if(temp_f1(0)>global_d_f1) {max_f1 = i;}
+                  if(temp_f2(0)>global_d_f2) {max_f2 = i;}
+                  if(temp_c1(0)<global_d_c1) {min_c1 = i;}
+                  if(temp_c2(0)<global_d_c2) {min_c2 = i;}
+
+                }
+              DoubleTab global_f1(dimension), global_f2(dimension), global_c1(dimension), global_c2(dimension);
+              DoubleTab long_axe(dimension), small_axe(dimension);
+              for(int d=0; d<dimension; ++d)
+                {
+                  global_f1(d) = coord_f1_list(max_f1, d);
+                  global_f2(d) = coord_f2_list(max_f2, d);
+                  long_axe(d) = global_f1(d) - global_f2(d);
+
+                  global_c1(d) = coord_c1_list(min_c1, d);
+                  global_c2(d) = coord_c2_list(min_c2, d);
+                  small_axe(d) = global_c1(d) - global_c2(d);
+                }
+
+              double angle_long_axe = acos(long_axe(1)/local_prodscal(long_axe, long_axe));//angle wrt the y axis
+              double angle_small_axe = acos(long_axe(0)/local_prodscal(small_axe, small_axe));//angle wrt the x axis
+              std::string path;
+              std::fstream f;
+              path = fichier_debug + "orientation_points.txt";
+              f.open(path, std::ios::app);
+              f<<t<<" ";
+              f.close();
+              path = fichier_debug + "orientation.txt";
+              f.open(path, std::ios::app);
+              f<<t<<" "<<angle_long_axe<<" "<<angle_small_axe<<"\n";
+            }
+        }
+      else
+        {
+          std::cout<<"got here"<<std::endl;
+          DoubleTab global_f1(dimension), global_f2(dimension), global_c1(dimension), global_c2(dimension);
+          DoubleTab long_axe(dimension), small_axe(dimension);
+          for(int d=0; d<dimension; ++d)
+            {
+              global_f1(d) = coord_f1(d+1);
+              global_f2(d) = coord_f2(d+1);
+              long_axe(d) = global_f1(d) - global_f2(d);
+              // long_axe(d) = xf1(d);
+
+              global_c1(d) = coord_c1(d+1);
+              global_c2(d) = coord_c2(d+1);
+              small_axe(d) = global_c1(d) - global_c2(d);
+              // small_axe(d) = xc1(d);
+            }
+          std::cout<<global_f1(0)<<" "<<global_f1(1)<<" "<<global_f1(2)<<std::endl;
+          std::cout<<global_f2(0)<<" "<<global_f2(1)<<" "<<global_f2(2)<<std::endl;
+
+          double angle_long_axe = acos(long_axe(1)/sqrt(local_prodscal(long_axe, long_axe)));//angle wrt the y axis
+          std::cout<<"angle_long_axe "<<angle_long_axe<<std::endl;
+          double angle_small_axe = acos(small_axe(3)/sqrt(local_prodscal(small_axe, small_axe)));//angle wrt the z axis
+          std::cout<<"angle_small_axe "<<angle_small_axe<<std::endl;
+          std::string path;
+          std::fstream f;
+          path = fichier_debug + "orientation_points.txt";
+          f.open(path, std::ios::app);
+          f<<t<<" ";
+          f.close();
+          path = fichier_debug + "orientation.txt";
+          f.open(path, std::ios::app);
+          f<<t<<" "<<angle_long_axe<<" "<<angle_small_axe<<"\n";
+        }
+    }
+
 }
 //XXX Inertia not a ref to debug only
 DoubleTab Collision_Model_FT_ellipsoid::compute_contact_moment(Matrice_Dense Inertia, DoubleTab const& force, DoubleTab const& r, DoubleTab const& Omega)
