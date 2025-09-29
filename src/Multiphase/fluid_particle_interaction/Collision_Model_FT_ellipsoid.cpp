@@ -465,7 +465,8 @@ void Collision_Model_FT_ellipsoid::compute_dX_dU_normal(DoubleTab& dX, DoubleTab
       DoubleTab r_i(dimension);
       for(int d=0; d<dimension; ++d)
         {
-          r_i(d) = sommets(compo_sommets[particle][i_som_closest],d) - particles_position(particle, d);
+          cp(d) = sommets(compo_sommets[particle][i_som_closest],d);
+          r_i(d) =cp(d) - particles_position(particle, d);
         }
 
       for (int d = 0; d < dimension; d++)
@@ -473,8 +474,7 @@ void Collision_Model_FT_ellipsoid::compute_dX_dU_normal(DoubleTab& dX, DoubleTab
 
       norm(ori) = (ind_wall < 3 ? 1 : -1); //La normale correspond à la normale à la paroi (seuls les parallélépipèdes sont considérés)
 
-      for (int d = 0; d < dimension; d++)
-        cp(d) = sommets(compo_sommets[particle][i_som_closest],d);
+        
     }
 }
 void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
@@ -542,7 +542,9 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
         {
           for(int j=0; j<dimension; ++j)
             {
-              Ji(i,j) = particles_inertia_tensor(particle_i, i, j)*density; //particles_inertia_tensor is computed without density in Transport_Interfaces_FT_Disc
+              if(std::fabs(particles_inertia_tensor(particle_i, i, j))>1e-15)
+                Ji(i,j) = particles_inertia_tensor(particle_i, i, j)*density; //particles_inertia_tensor is computed without density in Transport_Interfaces_FT_Disc
+              std::cout<<Ji(i,j)<<" ";
             }
           std::cout<<std::endl;
         }
@@ -580,7 +582,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           f_cp.close();
 
 
-          double dist_gravity_center = sqrt(local_carre_norme_vect(dX));//project on normal ?? XXX
+          double dist_gravity_center = -local_prodscal(dX,norm);//project on normal ?? XXX
           double dist_between_particles = 0.;
           if(is_particle_particle_collision)
             {
@@ -951,6 +953,7 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   const IntTab& face_voisins=domain_vf.face_voisins();
   double max_force = 0.;
   double max_moment = 0.;
+  DoubleTab moment(dimension);
   for (int face=0; face<nb_faces; face++)
     {
       const int left_elem=face_voisins(face,0);
@@ -960,15 +963,26 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
       const int id_number=std::max(id_left,id_right);
       if (id_number!=-1)
         {
+          for(int d=0; d<dimension; ++d)
+            {
+              moment(d) = lagrangian_contact_moments_(id_number,(d+1)%3) * (cg_faces(face,(d+2)%3) - particles_position(id_number,(d+2)%3)) -
+                          lagrangian_contact_moments_(id_number,(d+2)%3) * (cg_faces(face,(d+1)%3) - particles_position(id_number,(d+1)%3));
+            }
           const int ori=orientation(face);
           max_force = std::max(max_force, std::fabs((1 - volumic_phase_indicator_function(face)) * interlaced_volumes(face) * (lagrangian_contact_forces_(id_number, ori))));
           max_moment = std::max(max_moment, std::fabs((1 - volumic_phase_indicator_function(face)) * interlaced_volumes(face) *
                                                       (lagrangian_contact_moments_(id_number, (ori + 1) % 3) * (cg_faces(face, (ori + 2) % 3) - particles_position(id_number, (ori + 2) % 3)) -
                                                        lagrangian_contact_moments_(id_number, (ori + 2) % 3) * (cg_faces(face, (ori + 1) % 3) - particles_position(id_number, (ori + 1) % 3)))));
+
+
+
+          // contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
+          //                                 *interlaced_volumes(face)*(lagrangian_contact_moments_(id_number,ori));
+          // // contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
+          // //                                 *interlaced_volumes(face)      *   cg_faces(face,ori) * (ori==1);
+
           contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
-                                          *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori)
-                                                                     + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
-                                                                        lagrangian_contact_moments_(id_number,(ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) ))) ;
+                                          *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori) + moment(ori)) ;
         }
     }
   std::ofstream f,g;
