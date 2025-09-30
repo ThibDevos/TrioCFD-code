@@ -955,6 +955,7 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
 {
   static int t=0;
   const DoubleTab om = part_prop.rot_velocity;
+  const DoubleTab v = part_prop.velocity;
   const DoubleVect& interlaced_volumes=domain_vf.volumes_entrelaces();
   const DoubleTab& cg_faces=domain_vf.xv();
   const int nb_faces=interlaced_volumes.size_array();
@@ -963,6 +964,7 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   double max_force = 0.;
   double max_moment = 0.;
   DoubleTab omr(dimension);
+  DoubleTab omv(dimension);
   for (int face=0; face<nb_faces; face++)
     {
       const int left_elem=face_voisins(face,0);
@@ -976,13 +978,15 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
 
           for(int d=0; d<dimension; ++d)
             {
-              omr(d) = om((d+1)%3) * cg_faces(face,(d+2)%3) - om((d+2)%3) * cg_faces(face,(d+1)%3);
+              omr(d) = om(id_number,(d+1)%3) * cg_faces(face,(d+2)%3) - om(id_number,(d+2)%3) * cg_faces(face,(d+1)%3);
+              omv(d) = 2*( om(id_number,(d+1)%3) * v(id_number, (d+2)%3) - om(id_number,(d+2)%3) * v(id_number, (d+1)%3));
             }
           contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
                                           *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori)
                                                                      + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
                                                                         lagrangian_contact_moments_(id_number,(ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) )) +
-                                                                     2650 * ( om((ori+1)%3) * omr((ori+2)%3) - om((ori+2)%3) * omr((ori+1)%3) )
+                                                                     2650 * ( om((ori+1)%3) * omr((ori+2)%3) - om((ori+2)%3) * omr((ori+1)%3)  +
+                                                                              2650 * omv(ori))
                                                                     ) ;
         }
     }
