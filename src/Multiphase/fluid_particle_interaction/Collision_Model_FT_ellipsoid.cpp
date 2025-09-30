@@ -944,8 +944,17 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   const IntTab& particles_eulerian_id_number,
   const DoubleTab& particles_position,
   DoubleTab& contact_force_source_term)
+{}
+void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
+  const DoubleTab& volumic_phase_indicator_function,
+  const Domaine_VF& domain_vf,
+  const IntTab& particles_eulerian_id_number,
+  const DoubleTab& particles_position,
+  DoubleTab& contact_force_source_term,
+  const particle_properties& part_prop)
 {
   static int t=0;
+  const DoubleTab om = part_prop.rot_velocity;
   const DoubleVect& interlaced_volumes=domain_vf.volumes_entrelaces();
   const DoubleTab& cg_faces=domain_vf.xv();
   const int nb_faces=interlaced_volumes.size_array();
@@ -953,7 +962,7 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   const IntTab& face_voisins=domain_vf.face_voisins();
   double max_force = 0.;
   double max_moment = 0.;
-  DoubleTab moment(dimension);
+  DoubleTab omr(dimension);
   for (int face=0; face<nb_faces; face++)
     {
       const int left_elem=face_voisins(face,0);
@@ -963,26 +972,18 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
       const int id_number=std::max(id_left,id_right);
       if (id_number!=-1)
         {
+          const int ori=orientation(face);
+
           for(int d=0; d<dimension; ++d)
             {
-              moment(d) = lagrangian_contact_moments_(id_number,(d+1)%3) * (cg_faces(face,(d+2)%3) - particles_position(id_number,(d+2)%3)) -
-                          lagrangian_contact_moments_(id_number,(d+2)%3) * (cg_faces(face,(d+1)%3) - particles_position(id_number,(d+1)%3));
+              omr(d) = om((d+1)%3) * cg_faces(face,(d+2)%3) - om((d+2)%3) * cg_faces(face,(d+1)%3);
             }
-          const int ori=orientation(face);
-          max_force = std::max(max_force, std::fabs((1 - volumic_phase_indicator_function(face)) * interlaced_volumes(face) * (lagrangian_contact_forces_(id_number, ori))));
-          max_moment = std::max(max_moment, std::fabs((1 - volumic_phase_indicator_function(face)) * interlaced_volumes(face) *
-                                                      (lagrangian_contact_moments_(id_number, (ori + 1) % 3) * (cg_faces(face, (ori + 2) % 3) - particles_position(id_number, (ori + 2) % 3)) -
-                                                       lagrangian_contact_moments_(id_number, (ori + 2) % 3) * (cg_faces(face, (ori + 1) % 3) - particles_position(id_number, (ori + 1) % 3)))));
-
-
-
-          // contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
-          //                                 *interlaced_volumes(face)*(lagrangian_contact_moments_(id_number,ori));
-          // // contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
-          // //                                 *interlaced_volumes(face)      *   cg_faces(face,ori) * (ori==1);
-
           contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
-                                          *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori) + moment(ori)) ;
+                                          *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori)
+                                                                     + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
+                                                                        lagrangian_contact_moments_(id_number,(ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) )) +
+                                                                     2650 * ( om((ori+1)%3) * omr((ori+2)%3) - om((ori+2)%3) * omr((ori+1)%3) )
+                                                                    ) ;
         }
     }
   std::ofstream f,g;
