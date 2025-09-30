@@ -64,6 +64,17 @@ void Collision_Model_FT_arbitrary::discretize_contact_forces_eulerian_field(
   Process::exit("Collision_Model_FT_arbitrary::discretize_contact_forces_eulerian_field "
                 "particles with arbitrary shapes");
 }
+void Collision_Model_FT_arbitrary::discretize_contact_forces_eulerian_field(
+  const DoubleTab& volumic_phase_indicator_function,
+  const Domaine_VF& domain_vf,
+  const IntTab& particles_eulerian_id_number,
+  const DoubleTab& particles_position,
+  DoubleTab& contact_force_source_term,
+  const particle_properties& part_prop)
+{
+  Process::exit("Collision_Model_FT_arbitrary::discretize_contact_forces_eulerian_field "
+                "particles with arbitrary shapes");
+}
 
 
 

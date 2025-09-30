@@ -4082,7 +4082,8 @@ void Navier_Stokes_FT_Disc::compute_eulerian_field_contact_forces
     domain_vf,
     particles_eulerian_id_number_,
     particles_position,
-    contact_force);
+    contact_force,
+    part_prop);
 
   statistiques().end_count(count);
 }
