@@ -474,7 +474,7 @@ void Collision_Model_FT_ellipsoid::compute_dX_dU_normal(DoubleTab& dX, DoubleTab
 
       norm(ori) = (ind_wall < 3 ? 1 : -1); //La normale correspond à la normale à la paroi (seuls les parallélépipèdes sont considérés)
 
-        
+
     }
 }
 void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
@@ -582,7 +582,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           f_cp.close();
 
 
-          double dist_gravity_center = -local_prodscal(dX,norm);//project on normal ?? XXX
+          double dist_gravity_center = sqrt(local_carre_norme_vect(dX));//project on normal ?? XXX
           double dist_between_particles = 0.;
           if(is_particle_particle_collision)
             {
@@ -974,7 +974,7 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
       const int id_number=std::max(id_left,id_right);
       if (id_number!=-1)
         {
-          if(lagrangian_contact_forces_(id_number,0)!=0 || lagrangian_contact_forces_(id_number,1)!=0 || lagrangian_contact_forces_(id_number,2)!=0){collision = true;}
+          if(lagrangian_contact_forces_(id_number,0)!=0 || lagrangian_contact_forces_(id_number,1)!=0 || lagrangian_contact_forces_(id_number,2)!=0) {collision = true;}
           const int ori=orientation(face);
 
           for(int d=0; d<dimension; ++d)
@@ -986,7 +986,7 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
                                           *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori)
                                                                      + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
                                                                         lagrangian_contact_moments_(id_number,(ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) )) +
-                                                                        collision * part_prop.density * ( om((ori+1)%3) * omr((ori+2)%3) - om((ori+2)%3) * omr((ori+1)%3)));
+                                                                     collision * part_prop.density * ( om((ori+1)%3) * omr((ori+2)%3) - om((ori+2)%3) * omr((ori+1)%3)));
         }
     }
   std::ofstream f,g;
