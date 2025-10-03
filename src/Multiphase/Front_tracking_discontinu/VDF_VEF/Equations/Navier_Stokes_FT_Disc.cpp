@@ -4027,7 +4027,8 @@ void Navier_Stokes_FT_Disc::compute_eulerian_field_contact_forces
   const DoubleTab& volume=eq_transport.get_particles_volume();
   const Fluide_Diphasique& two_phase_fluid = fluide_diphasique();
 
-  const particle_properties part_prop(particles_position,particles_velocity,particles_rot_velocity,particles_inertia_tensors, volume, schema_temps().temps_courant());
+  particle_properties part_prop(particles_position,particles_velocity,particles_rot_velocity,particles_inertia_tensors, volume, schema_temps().temps_courant());
+  part_prop.density = 0.;
   // Step 1: Collision detection
   //const ArrOfInt& gravity_center_elem = eq_transport.get_gravity_center_elem();
   int& nb_dt_Verlet = collision_model.get_set_nb_dt_Verlet();

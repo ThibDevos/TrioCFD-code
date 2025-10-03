@@ -20,6 +20,7 @@ struct particle_properties
   DoubleTab const& rot_velocity;
   DoubleTab const& inertia_tensor;
   DoubleTab const& volume;
+  double density; 
   double t;
 };
 

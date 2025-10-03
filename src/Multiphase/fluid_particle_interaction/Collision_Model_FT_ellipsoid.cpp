@@ -964,7 +964,7 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   double max_force = 0.;
   double max_moment = 0.;
   DoubleTab omr(dimension);
-  DoubleTab omv(dimension);
+  bool collision = false; // if no collision, we don't apply centrifugal force
   for (int face=0; face<nb_faces; face++)
     {
       const int left_elem=face_voisins(face,0);
@@ -974,20 +974,19 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
       const int id_number=std::max(id_left,id_right);
       if (id_number!=-1)
         {
+          if(lagrangian_contact_forces_(id_number,0)!=0 || lagrangian_contact_forces_(id_number,1)!=0 || lagrangian_contact_forces_(id_number,2)!=0){collision = true;}
           const int ori=orientation(face);
 
           for(int d=0; d<dimension; ++d)
             {
-              omr(d) = om(id_number,(d+1)%3) * cg_faces(face,(d+2)%3) - om(id_number,(d+2)%3) * cg_faces(face,(d+1)%3);
-              omv(d) = 2*( om(id_number,(d+1)%3) * v(id_number, (d+2)%3) - om(id_number,(d+2)%3) * v(id_number, (d+1)%3));
+              omr(d) = om(id_number,(d+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) - om(id_number,(d+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) );
             }
+
           contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
                                           *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori)
                                                                      + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
                                                                         lagrangian_contact_moments_(id_number,(ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) )) +
-                                                                     2650 * ( om((ori+1)%3) * omr((ori+2)%3) - om((ori+2)%3) * omr((ori+1)%3)  +
-                                                                              2650 * omv(ori))
-                                                                    ) ;
+                                                                        collision * part_prop.density * ( om((ori+1)%3) * omr((ori+2)%3) - om((ori+2)%3) * omr((ori+1)%3)));
         }
     }
   std::ofstream f,g;
