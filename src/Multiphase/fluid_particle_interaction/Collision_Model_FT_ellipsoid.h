@@ -20,6 +20,17 @@
 #include <Matrice_Dense.h>
 #include <fstream>
 
+
+struct collision_parameters
+{
+  int particle_i;
+  int particle_j;
+  int i_closest;
+  int j_closest;
+  bool i_facet;
+  bool j_facet;
+};
+
 /*! @brief : class Collision_Model_FT
  *
  *  Description: This class enables to compute solid-solid
@@ -47,16 +58,21 @@ public:
                       const Schema_Comm& schema_comm_FT);
   void compute_fictive_wall_coordinates(const double& radius);
   void  collision_point(Maillage_FT_Disc const& maillage, int i_closest, int j_closest, bool i_fa7, bool j_fa7, DoubleTab& xc);
-  void deepest_points(IntLists const& compo_sommets, IntLists const& sommets_facets, Maillage_FT_Disc const& mesh, int particle, int neighbor,
-                      DoubleTab const& positions, bool check_cg, DoubleTab& dX, int& i_closest, int& j_closest, bool& i_facet, bool& j_facet);
-  void closest_nodes(IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, int particle, int neighbor,
-                     DoubleTab const& positions, DoubleTab& dX, int& i_closest, int& j_closest, bool chek_cg, bool i_facet, bool j_facet);
-  void normal_i(Maillage_FT_Disc const& mesh, IntLists const& sommets_facets, bool i_facet, int i_closest, DoubleTab& n);
-  void normal_average_ij(Maillage_FT_Disc const& mesh,IntLists const& sommets_facets, bool i_facet, int i_closest, bool j_facet, int j_closest, DoubleTab& n);
+  void deepest_points(IntLists const& compo_sommets, IntLists const& sommets_facets, Maillage_FT_Disc const& mesh, collision_parameters& param,
+                      DoubleTab const& positions, bool check_cg, DoubleTab& dX);
+  void closest_nodes(IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, collision_parameters& param,
+                     DoubleTab& dX, bool chek_cg);
+  void normal_i(Maillage_FT_Disc const& mesh, IntLists const& sommets_facets, collision_parameters& param, DoubleTab& n);
+  void normal_average_ij(Maillage_FT_Disc const& mesh,IntLists const& sommets_facets, collision_parameters& param, DoubleTab& n);
   void compute_dX_dU_normal(DoubleTab& dX, DoubleTab& dU, DoubleTab& norm, DoubleTab& cp, const int particle,
                             const int neighbor, const DoubleTab& particles_position, const DoubleTab& particles_velocity, const DoubleTab& particles_rot_velocity, const bool is_particle_particle_collision,
                             const IntLists& compo_sommets, const IntLists& sommets_facets, const Maillage_FT_Disc& mesh);
-
+  void compute_dX(DoubleTab& dX, collision_parameters& param, const DoubleTab& particles_position,
+                  const bool is_particle_particle_collision, const IntLists& compo_sommets,
+                  const IntLists& sommets_facets, const Maillage_FT_Disc& mesh);
+  void compute_norm(DoubleTab& norm, collision_parameters& param, const IntLists& sommets_facets, const Maillage_FT_Disc& mesh);
+  void compute_dU_cp(DoubleTab& dU, DoubleTab& cp, collision_parameters& param, bool is_particle_particle_collision,
+                     const IntLists& compo_sommets,const particle_properties& part_prop, const Maillage_FT_Disc& mesh);
   void output_orientation(const DoubleTab& particles_position, IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, int nb_compo, double t);
 
   DoubleTab compute_contact_moment(Matrice_Dense Inertia, DoubleTab const& force, DoubleTab const& contact_point, DoubleTab const& Omega);

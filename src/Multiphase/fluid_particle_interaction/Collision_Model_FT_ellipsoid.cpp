@@ -93,8 +93,8 @@ Sortie& Collision_Model_FT_ellipsoid::printOn(Sortie& os) const
   return os;
 }
 
-void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets, IntLists const& sommets_facets, Maillage_FT_Disc const& mesh, int compo_i, int compo_j,
-                                                  DoubleTab const& positions, bool check_cg, DoubleTab& dX, int& i_closest, int& j_closest, bool& i_fa7, bool& j_fa7)
+void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets, IntLists const& sommets_facets, Maillage_FT_Disc const& mesh, collision_parameters& param,
+                                                  DoubleTab const& positions, bool check_cg, DoubleTab& dX)
 {
   const DoubleTab& sommets = mesh.sommets();
   DoubleTab dX_min(dimension);
@@ -106,12 +106,12 @@ void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets,
     dX_min(d) = 1000.;
   double dX_min_norm_i = sqrt(local_carre_norme_vect(dX_min));
 
-  for (int i_som = 0; i_som < compo_sommets[compo_i].size(); ++i_som)
+  for (int i_som = 0; i_som < compo_sommets[param.particle_i].size(); ++i_som)
     {
-      int i_global = compo_sommets[compo_i][i_som];
+      int i_global = compo_sommets[param.particle_i][i_som];
       for (int d = 0; d < dimension; ++d)
         {
-          dX(d) = sommets(i_global, d) - positions(compo_j, d);
+          dX(d) = sommets(i_global, d) - positions(param.particle_j, d);
         }
       dist_cg = sqrt(local_carre_norme_vect(dX));
       if (dist_cg < dX_min_norm_i)
@@ -130,12 +130,12 @@ void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets,
     dX_min(d) = 1000.;
   double dX_min_norm_j = sqrt(local_carre_norme_vect(dX_min));
 
-  for (int j_som = 0; j_som < compo_sommets[compo_j].size(); ++j_som)
+  for (int j_som = 0; j_som < compo_sommets[param.particle_j].size(); ++j_som)
     {
-      int j_global = compo_sommets[compo_j][j_som];
+      int j_global = compo_sommets[param.particle_j][j_som];
       for (int d = 0; d < dimension; ++d)
         {
-          dX(d) = sommets(j_global, d) - positions(compo_i, d);
+          dX(d) = sommets(j_global, d) - positions(param.particle_i, d);
         }
       dist_cg = sqrt(local_carre_norme_vect(dX));
       if (dist_cg < dX_min_norm_j)
@@ -161,7 +161,7 @@ void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets,
           int fa7 = sommets_facets[i_som_closest][fi];
           for (int d = 0; d < dimension; ++d)
             {
-              dX(d) = cg_fa7(fa7, d) - positions(compo_j, d);
+              dX(d) = cg_fa7(fa7, d) - positions(param.particle_j, d);
             }
           dist_cg = sqrt(local_carre_norme_vect(dX));
           if (dist_cg < dX_min_norm_i)
@@ -179,7 +179,7 @@ void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets,
           int fa7 = sommets_facets[j_som_closest][fj];
           for (int d = 0; d < dimension; ++d)
             {
-              dX(d) = cg_fa7(fa7, d) - positions(compo_i, d);
+              dX(d) = cg_fa7(fa7, d) - positions(param.particle_i, d);
             }
           dist_cg = sqrt(local_carre_norme_vect(dX));
           if (dist_cg < dX_min_norm_j)
@@ -199,8 +199,8 @@ void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets,
 
   if (fi_closest < 0)
     {
-      i_fa7 = false;
-      i_closest = i_som_closest;
+      param.i_facet = false;
+      param.i_closest = i_som_closest;
       for (int d = 0; d < dimension; ++d)
         {
           deepest_i(d) = sommets(i_som_closest, d);
@@ -208,8 +208,8 @@ void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets,
     }
   else
     {
-      i_fa7 = true;
-      i_closest = fi_closest;
+      param.i_facet = true;
+      param.i_closest = fi_closest;
       for (int d = 0; d < dimension; ++d)
         {
           deepest_i(d) = cg_fa7(fi_closest, d);
@@ -217,8 +217,8 @@ void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets,
     }
   if (fj_closest < 0)
     {
-      j_fa7 = false;
-      j_closest = j_som_closest;
+      param.j_facet = false;
+      param.j_closest = j_som_closest;
       for (int d = 0; d < dimension; ++d)
         {
           deepest_j(d) = sommets(j_som_closest, d);
@@ -226,8 +226,8 @@ void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets,
     }
   else
     {
-      j_fa7 = true;
-      j_closest = fj_closest;
+      param.j_facet = true;
+      param.j_closest = fj_closest;
       for (int d = 0; d < dimension; ++d)
         {
           deepest_j(d) = cg_fa7(fj_closest, d);
@@ -240,14 +240,14 @@ void Collision_Model_FT_ellipsoid::deepest_points(IntLists const& compo_sommets,
     }
 }
 
-void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, int particle, int neighbor,
-                                                 DoubleTab const& positions, DoubleTab& dX, int& i_closest, int& j_closest, bool chek_cg, bool i_facet, bool j_facet)
+void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, collision_parameters& param,
+                                                 DoubleTab& dX, bool chek_cg)
 {
   auto sommets = mesh.sommets();
   DoubleTab dX_min(dimension);
   double dist_cg = 0.;
-  i_closest = -1;
-  j_closest = -1;
+  param.i_closest = -1;
+  param.j_closest = -1;
   for (int d = 0; d < dimension; ++d)
     dX_min(d) = 1000.;
 
@@ -256,15 +256,15 @@ void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, 
     }
   else
     {
-      std::cout<<"["<<Process::me()<<"] : "<<"Particule "<<particle <<" compare with particle "<<neighbor<<std::endl;
-      std::cout<<"["<<Process::me()<<"] : "<<compo_sommets[particle].size()<<" vs "<<compo_sommets[neighbor].size()<<std::endl;
+      std::cout<<"["<<Process::me()<<"] : "<<"Particule "<<param.particle_i <<" compare with particle "<<param.particle_j<<std::endl;
+      std::cout<<"["<<Process::me()<<"] : "<<compo_sommets[param.particle_i].size()<<" vs "<<compo_sommets[param.particle_j].size()<<std::endl;
       double dX_min_norm = sqrt(local_carre_norme_vect(dX_min));
-      for (int i = 0; i < compo_sommets[particle].size(); ++i)
+      for (int i = 0; i < compo_sommets[param.particle_i].size(); ++i)
         {
-          int i_global = compo_sommets[particle][i];
-          for (int j = 0; j < compo_sommets[neighbor].size(); ++j)
+          int i_global = compo_sommets[param.particle_i][i];
+          for (int j = 0; j < compo_sommets[param.particle_j].size(); ++j)
             {
-              int j_global = compo_sommets[neighbor][j];
+              int j_global = compo_sommets[param.particle_j][j];
               for (int d = 0; d < dimension; ++d)
                 {
                   dX(d) = sommets(i_global, d) - sommets(j_global, d);
@@ -277,8 +277,8 @@ void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, 
                       dX_min(d) = dX(d);
                     }
                   dX_min_norm = dist_cg;
-                  i_closest = i_global;
-                  j_closest = j_global;
+                  param.i_closest = i_global;
+                  param.j_closest = j_global;
                 }
             }
         }
@@ -287,22 +287,20 @@ void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, 
     {
       dX(d) = dX_min(d);
     }
-  assert(i_closest >= 0);
-  assert(j_closest >= 0);
 }
 
-void Collision_Model_FT_ellipsoid::normal_i(Maillage_FT_Disc const& mesh, IntLists const& sommets_facets, bool i_facet, int i_closest, DoubleTab& n)
+void Collision_Model_FT_ellipsoid::normal_i(Maillage_FT_Disc const& mesh, IntLists const& sommets_facets, collision_parameters& param, DoubleTab& n)
 {
   auto nfacets = mesh.get_normale_facettes();
-  if(i_facet)
+  if(param.i_facet)
     {
-      for(int d = 0; d<dimension; ++d) {n(d) = nfacets(i_closest,d);}
+      for(int d = 0; d<dimension; ++d) {n(d) = nfacets(param.i_closest,d);}
     }
   else //the deepest point is the node -> the normal at the node is the average of the normal of the incident facets
     {
-      for(int fi = 0; fi<sommets_facets[i_closest].size(); ++fi)
+      for(int fi = 0; fi<sommets_facets[param.i_closest].size(); ++fi)
         {
-          int fa7 = sommets_facets[i_closest][fi];
+          int fa7 = sommets_facets[param.i_closest][fi];
           for(int d = 0; d<dimension; ++d) {n(d) += nfacets(fa7,d);}
         }
     }
@@ -310,33 +308,33 @@ void Collision_Model_FT_ellipsoid::normal_i(Maillage_FT_Disc const& mesh, IntLis
   for(int d = 0; d<dimension; ++d) {n(d)/=nn;}
 }
 
-void Collision_Model_FT_ellipsoid::normal_average_ij(Maillage_FT_Disc const& mesh,IntLists const& sommets_facets, bool i_facet, int i_closest, bool j_facet, int j_closest, DoubleTab& n)
+void Collision_Model_FT_ellipsoid::normal_average_ij(Maillage_FT_Disc const& mesh,IntLists const& sommets_facets, collision_parameters& param, DoubleTab& n)
 {
   auto nfacets = mesh.get_normale_facettes();
   DoubleTab ni(dimension);
   DoubleTab nj(dimension);
 
-  if(i_facet)
+  if(param.i_facet)
     {
-      for(int d = 0; d<dimension; ++d) {ni(d) = nfacets(i_closest,d);}
+      for(int d = 0; d<dimension; ++d) {ni(d) = nfacets(param.i_closest,d);}
     }
   else //the deepest point is the node -> the normal at the node is the average of the normal of the incident facets
     {
-      for(int fi = 0; fi<sommets_facets[i_closest].size(); ++fi)
+      for(int fi = 0; fi<sommets_facets[param.i_closest].size(); ++fi)
         {
-          int fa7 = sommets_facets[i_closest][fi];
+          int fa7 = sommets_facets[param.i_closest][fi];
           for(int d = 0; d<dimension; ++d) {ni(d) += nfacets(fa7,d);}
         }
     }
-  if(j_facet)
+  if(param.j_facet)
     {
-      for(int d = 0; d<dimension; ++d) {nj(d) = nfacets(j_closest,d);}
+      for(int d = 0; d<dimension; ++d) {nj(d) = nfacets(param.j_closest,d);}
     }
   else //the deepest point is the node -> the normal at the node is the average of the normal of the incident facets
     {
-      for(int fi = 0; fi<sommets_facets[j_closest].size(); ++fi)
+      for(int fi = 0; fi<sommets_facets[param.j_closest].size(); ++fi)
         {
-          int fa7 = sommets_facets[j_closest][fi];
+          int fa7 = sommets_facets[param.j_closest][fi];
           for(int d = 0; d<dimension; ++d) {nj(d) += nfacets(fa7,d);}
         }
     }
@@ -378,70 +376,73 @@ void Collision_Model_FT_ellipsoid::collision_point(Maillage_FT_Disc const& mesh,
     }
 }
 
-void Collision_Model_FT_ellipsoid::compute_dX_dU_normal(DoubleTab& dX, DoubleTab& dU, DoubleTab& norm, DoubleTab& cp, int particle,
-                                                        int neighbor, const DoubleTab& particles_position, const
-                                                        DoubleTab& particles_velocity, DoubleTab const& particles_rot_velocity, const bool is_particle_particle_collision,
-                                                        const IntLists& compo_sommets,const IntLists& sommets_facets, const Maillage_FT_Disc& mesh )
+void Collision_Model_FT_ellipsoid::compute_dX(DoubleTab& dX, collision_parameters& param, const DoubleTab& particles_position,
+                                              const bool is_particle_particle_collision, const IntLists& compo_sommets,
+                                              const IntLists& sommets_facets, const Maillage_FT_Disc& mesh)
 {
   const DoubleTab& sommets = mesh.sommets();
-  if (is_particle_particle_collision)
+  if(is_particle_particle_collision)
     {
       bool check_cg = true;
-      int i_closest, j_closest;
-      bool i_facet = false, j_facet=false;
       if(collision_detection_==Collision_detection::CLOSEST)
         {
-          closest_nodes(compo_sommets, mesh, particle, neighbor, particles_position ,dX, i_closest, j_closest, false, i_facet, j_facet); //check_cg not implemented
+          closest_nodes(compo_sommets, mesh, param ,dX, false); //check_cg not implemented
         }
 
       if(collision_detection_==Collision_detection::DEEPEST)
         {
-          deepest_points(compo_sommets,sommets_facets,mesh,particle, neighbor, particles_position, check_cg, dX, i_closest, j_closest, i_facet, j_facet);
+          deepest_points(compo_sommets,sommets_facets,mesh, param, particles_position, check_cg, dX);
         }
-      if(collision_normal_==Collision_normal::NORMAL_I)
+    }
+  else
+    {
+      if(sommets.dimension(0)==0) {return;} //for Procs that don't have any vertex
+      int ind_wall = param.particle_j - nb_particles_tot_;
+      int ori = ind_wall < dimension ? ind_wall : ind_wall - dimension;
+      double dX_min =  std::numeric_limits<double>::max();
+      for(int i_som = 0; i_som < compo_sommets[param.particle_i].size(); ++i_som) //recherche le sommet le plus proche du mur
         {
-          normal_i(mesh, sommets_facets, i_facet, i_closest, norm);
+          dX(ori) = std::fabs(sommets(compo_sommets[param.particle_i][i_som],ori) -  (origin_(ori) + (ind_wall>2)*domain_dimensions_(ori)));
+          if(dX(ori) < dX_min ) param.i_closest = i_som;
+          dX_min = dX(ori) <= dX_min ? dX(ori) : dX_min;
         }
-      if(collision_normal_==Collision_normal::NORMAL_IJ)
-        {
-          normal_average_ij(mesh, sommets_facets, i_facet, i_closest, j_facet, j_closest, norm);
-        }
-      collision_point(mesh, i_closest, j_closest, i_facet, j_facet, cp);
-      DoubleTab const& cg_fa7 = mesh.get_gravity_center_fa7();
+      dX(ori) = dX_min;
+    }
+}
+
+void Collision_Model_FT_ellipsoid::compute_norm(DoubleTab& norm, collision_parameters& param, const IntLists& sommets_facets, const Maillage_FT_Disc& mesh)
+{
+
+  if(collision_normal_==Collision_normal::NORMAL_I)
+    {
+      normal_i(mesh, sommets_facets, param, norm);
+    }
+  if(collision_normal_==Collision_normal::NORMAL_IJ)
+    {
+      normal_average_ij(mesh, sommets_facets, param, norm);
+    }
+}
+
+void Collision_Model_FT_ellipsoid::compute_dU_cp(DoubleTab& dU, DoubleTab& cp, collision_parameters& param, bool is_particle_particle_collision,
+                                                 const IntLists& compo_sommets,const particle_properties& part_prop, const Maillage_FT_Disc& mesh)
+{
+  const DoubleTab& sommets = mesh.sommets();
+  if(is_particle_particle_collision)
+    {
+      collision_point(mesh, param.i_closest, param.j_closest, param.i_facet, param.j_facet, cp);
       DoubleTab velocity_node_i(dimension), r_i(dimension);
       DoubleTab velocity_node_j(dimension), r_j(dimension);
-      if(i_facet)
-        {
-          for(int d=0; d<dimension; ++d)
-            {
-              r_i(d) = cg_fa7(i_closest,d) - particles_position(particle, d);
-            }
-        }
-      else
-        {
-          for(int d=0; d<dimension; ++d)
-            {
-              r_i(d) = sommets(i_closest,d) - particles_position(particle, d);
-            }
-        }
-      if(j_facet)
-        {
-          for(int d=0; d<dimension; ++d)
-            {
-              r_j(d) = cg_fa7(j_closest,d) - particles_position(neighbor, d);
-            }
-        }
-      else
-        {
-          for(int d=0; d<dimension; ++d)
-            {
-              r_j(d) = sommets(j_closest,d) - particles_position(neighbor, d);
-            }
-        }
+
       for(int d=0; d<dimension; ++d)
         {
-          velocity_node_i(d) = particles_velocity(particle,d) + particles_rot_velocity(particle,(d+1)%3) * r_i((d+2)%3) - particles_rot_velocity(particle,(d+2)%3) * r_i((d+1)%3);
-          velocity_node_j(d) = particles_velocity(neighbor,d) + particles_rot_velocity(neighbor,(d+1)%3) * r_j((d+2)%3) - particles_rot_velocity(neighbor,(d+2)%3) * r_j((d+1)%3);
+          r_i(d) = cp(d) - part_prop.position(param.particle_i, d);
+          r_j(d) = cp(d) - part_prop.position(param.particle_j, d);
+        }
+
+      for(int d=0; d<dimension; ++d)
+        {
+          velocity_node_i(d) = part_prop.velocity(param.particle_i,d) + part_prop.rot_velocity(param.particle_i,(d+1)%3) * r_i((d+2)%3) - part_prop.rot_velocity(param.particle_i,(d+2)%3) * r_i((d+1)%3);
+          velocity_node_j(d) = part_prop.velocity(param.particle_j,d) + part_prop.rot_velocity(param.particle_j,(d+1)%3) * r_j((d+2)%3) - part_prop.rot_velocity(param.particle_j,(d+2)%3) * r_j((d+1)%3);
         }
       for (int d = 0; d < dimension; d++)
         {
@@ -450,33 +451,117 @@ void Collision_Model_FT_ellipsoid::compute_dX_dU_normal(DoubleTab& dX, DoubleTab
     }
   else
     {
-      if(sommets.dimension(0)==0) {return;} //for Procs that don't have any vertex
-      int ind_wall = neighbor - nb_particles_tot_;
-      int ori = ind_wall < dimension ? ind_wall : ind_wall - dimension;
-      double dX_min =  std::numeric_limits<double>::max();
-      int i_som_closest=-1;
-      for(int i_som = 0; i_som < compo_sommets[particle].size(); ++i_som) //recherche le sommet le plus proche du mur
-        {
-          dX(ori) = std::fabs(sommets(compo_sommets[particle][i_som],ori) -  (origin_(ori) + (ind_wall>2)*domain_dimensions_(ori)));
-          if(dX(ori) < dX_min ) i_som_closest = i_som;
-          dX_min = dX(ori) <= dX_min ? dX(ori) : dX_min;
-        }
-      dX(ori) = dX_min;
       DoubleTab r_i(dimension);
       for(int d=0; d<dimension; ++d)
         {
-          cp(d) = sommets(compo_sommets[particle][i_som_closest],d);
-          r_i(d) =cp(d) - particles_position(particle, d);
+          cp(d) = sommets(compo_sommets[param.particle_i][param.i_closest],d);
+          r_i(d) =cp(d) - part_prop.position(param.particle_i, d);
         }
-
       for (int d = 0; d < dimension; d++)
-        dU(d) = particles_velocity(particle,d) + (particles_rot_velocity(particle,(d+1)%3) * r_i((d+2)%3) - particles_rot_velocity(particle,(d+2)%3) * r_i((d+1)%3));
-
-      norm(ori) = (ind_wall < 3 ? 1 : -1); //La normale correspond à la normale à la paroi (seuls les parallélépipèdes sont considérés)
-
-
+        dU(d) = part_prop.velocity(param.particle_i,d) + (part_prop.rot_velocity(param.particle_i,(d+1)%3) * r_i((d+2)%3) - part_prop.rot_velocity(param.particle_i,(d+2)%3) * r_i((d+1)%3));
     }
+
 }
+
+// void Collision_Model_FT_ellipsoid::compute_dX_dU_normal(DoubleTab& dX, DoubleTab& dU, DoubleTab& norm, DoubleTab& cp, int particle,
+//                                                         int neighbor, const DoubleTab& particles_position, const
+//                                                         DoubleTab& particles_velocity, DoubleTab const& particles_rot_velocity, const bool is_particle_particle_collision,
+//                                                         const IntLists& compo_sommets,const IntLists& sommets_facets, const Maillage_FT_Disc& mesh )
+// {
+//   const DoubleTab& sommets = mesh.sommets();
+//   if (is_particle_particle_collision)
+//     {
+//       bool check_cg = true;
+//       int i_closest, j_closest;
+//       bool i_facet = false, j_facet=false;
+//       if(collision_detection_==Collision_detection::CLOSEST)
+//         {
+//           closest_nodes(compo_sommets, mesh, particle, neighbor, particles_position ,dX, i_closest, j_closest, false, i_facet, j_facet); //check_cg not implemented
+//         }
+
+//       if(collision_detection_==Collision_detection::DEEPEST)
+//         {
+//           deepest_points(compo_sommets,sommets_facets,mesh,particle, neighbor, particles_position, check_cg, dX, i_closest, j_closest, i_facet, j_facet);
+//         }
+//       if(collision_normal_==Collision_normal::NORMAL_I)
+//         {
+//           normal_i(mesh, sommets_facets, i_facet, i_closest, norm);
+//         }
+//       if(collision_normal_==Collision_normal::NORMAL_IJ)
+//         {
+//           normal_average_ij(mesh, sommets_facets, i_facet, i_closest, j_facet, j_closest, norm);
+//         }
+//       collision_point(mesh, i_closest, j_closest, i_facet, j_facet, cp);
+//       DoubleTab const& cg_fa7 = mesh.get_gravity_center_fa7();
+//       DoubleTab velocity_node_i(dimension), r_i(dimension);
+//       DoubleTab velocity_node_j(dimension), r_j(dimension);
+//       if(i_facet)
+//         {
+//           for(int d=0; d<dimension; ++d)
+//             {
+//               r_i(d) = cg_fa7(i_closest,d) - particles_position(particle, d);
+//             }
+//         }
+//       else
+//         {
+//           for(int d=0; d<dimension; ++d)
+//             {
+//               r_i(d) = sommets(i_closest,d) - particles_position(particle, d);
+//             }
+//         }
+//       if(j_facet)
+//         {
+//           for(int d=0; d<dimension; ++d)
+//             {
+//               r_j(d) = cg_fa7(j_closest,d) - particles_position(neighbor, d);
+//             }
+//         }
+//       else
+//         {
+//           for(int d=0; d<dimension; ++d)
+//             {
+//               r_j(d) = sommets(j_closest,d) - particles_position(neighbor, d);
+//             }
+//         }
+//       for(int d=0; d<dimension; ++d)
+//         {
+//           velocity_node_i(d) = particles_velocity(particle,d) + particles_rot_velocity(particle,(d+1)%3) * r_i((d+2)%3) - particles_rot_velocity(particle,(d+2)%3) * r_i((d+1)%3);
+//           velocity_node_j(d) = particles_velocity(neighbor,d) + particles_rot_velocity(neighbor,(d+1)%3) * r_j((d+2)%3) - particles_rot_velocity(neighbor,(d+2)%3) * r_j((d+1)%3);
+//         }
+//       for (int d = 0; d < dimension; d++)
+//         {
+//           dU(d) = velocity_node_i(d) - velocity_node_j(d);
+//         }
+//     }
+//   else
+//     {
+//       if(sommets.dimension(0)==0) {return;} //for Procs that don't have any vertex
+//       int ind_wall = neighbor - nb_particles_tot_;
+//       int ori = ind_wall < dimension ? ind_wall : ind_wall - dimension;
+//       double dX_min =  std::numeric_limits<double>::max();
+//       int i_som_closest=-1;
+//       for(int i_som = 0; i_som < compo_sommets[particle].size(); ++i_som) //recherche le sommet le plus proche du mur
+//         {
+//           dX(ori) = std::fabs(sommets(compo_sommets[particle][i_som],ori) -  (origin_(ori) + (ind_wall>2)*domain_dimensions_(ori)));
+//           if(dX(ori) < dX_min ) i_som_closest = i_som;
+//           dX_min = dX(ori) <= dX_min ? dX(ori) : dX_min;
+//         }
+//       dX(ori) = dX_min;
+//       DoubleTab r_i(dimension);
+//       for(int d=0; d<dimension; ++d)
+//         {
+//           cp(d) = sommets(compo_sommets[particle][i_som_closest],d);
+//           r_i(d) =cp(d) - particles_position(particle, d);
+//         }
+
+//       for (int d = 0; d < dimension; d++)
+//         dU(d) = particles_velocity(particle,d) + (particles_rot_velocity(particle,(d+1)%3) * r_i((d+2)%3) - particles_rot_velocity(particle,(d+2)%3) * r_i((d+1)%3));
+
+//       norm(ori) = (ind_wall < 3 ? 1 : -1); //La normale correspond à la normale à la paroi (seuls les parallélépipèdes sont considérés)
+
+
+//     }
+// }
 void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluide_Diphasique& two_phase_fluid,
                                                                      const DoubleTab& particles_position,
                                                                      const DoubleTab& particles_velocity,
@@ -556,9 +641,38 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           norm = 0;
           int particle_j=get_particle_j(ind_particle_i,ind_particle_j);
           int is_particle_particle_collision = particle_j < nb_particles_tot_;
+          collision_parameters param;
+          param.particle_i = particle_i;
+          param.particle_j = particle_j;
 
-          compute_dX_dU_normal(dX, dU, norm, collision_point, particle_i, particle_j, particles_position,
-                               particles_velocity, particles_rot_velocity, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
+
+          compute_dX(dX, param, particles_position, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
+          if(is_particle_particle_collision)
+            {
+              compute_norm(norm, param, sommets_facets, mesh);
+            }
+          else
+            {
+              int ind_wall = particle_j - nb_particles_tot_;
+              int ori = ind_wall < dimension ? ind_wall : ind_wall - dimension;
+              norm(ori) = (ind_wall < 3 ? 1 : -1); //La normale correspond à la normale à la paroi (seuls les parallélépipèdes sont considérés)
+            }
+
+          double dist_between_particles = 0.;
+          if(is_particle_particle_collision)
+            {
+              dist_between_particles = -local_prodscal(dX,norm); //normal penetration distance
+            }
+          else
+            {
+              double dist_gravity_center = sqrt(local_carre_norme_vect(dX));//project on normal ?? XXX
+              dist_between_particles = dist_gravity_center - activation_distance_ ;
+            }
+
+          // Check if the current proc is the one that has to compute the force
+
+
+
           std::cout<<"["<<Process::me()<<"] : "<<"finished compute dx du normal "<<is_particle_particle_collision<<std::endl;
           std::ofstream ffn, fft, fm, fu, fd;
           std::string path;
@@ -582,20 +696,14 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           f_cp.close();
 
 
-          double dist_gravity_center = sqrt(local_carre_norme_vect(dX));//project on normal ?? XXX
-          double dist_between_particles = 0.;
-          if(is_particle_particle_collision)
-            {
-              dist_between_particles = -local_prodscal(dX,norm); //normal penetration distance
-            }
-          else
-            {
-              dist_between_particles = dist_gravity_center - activation_distance_ ;
-            }
+
           F_now_(particle_i, particle_j) = 0;
           double max_dist = 0.;
           if (dist_between_particles <= 0) // contact
             {
+
+              compute_dU_cp(dU, collision_point, param, is_particle_particle_collision, compo_sommets, part_prop, mesh);
+
               std::cout<<"["<<Process::me()<<"] : "<<"Collision detected !!!!"<<std::endl;
               max_dist = std::max(max_dist, -dist_between_particles);
 
