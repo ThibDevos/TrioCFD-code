@@ -27,8 +27,8 @@ struct collision_parameters
   int particle_j;
   int i_closest;
   int j_closest;
-  bool i_facet;
-  bool j_facet;
+  bool i_facet = false;
+  bool j_facet = false;
 };
 
 /*! @brief : class Collision_Model_FT

@@ -616,7 +616,8 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
       int particle_i=get_particle_i(ind_particle_i);
       int nb_particles_j=get_nb_particles_j(ind_particle_i);
       int ind_start_part_j=get_ind_start_particles_j(ind_particle_i);
-      if(compo_sommets[ind_particle_i].size()==0)continue;
+      std::cout<<"Je suis le proc "<<Process::me()<<" et j'ai "<<nb_particles_j<<" nb_particles_j et je demarre a "<<ind_start_part_j<<std::endl;
+      // if(compo_sommets[ind_particle_i].size()==0)continue;
 
       Matrice_Dense Ji(dimension, dimension);
       DoubleTab ri(dimension);
@@ -629,48 +630,54 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
             {
               if(std::fabs(particles_inertia_tensor(particle_i, i, j))>1e-15)
                 Ji(i,j) = particles_inertia_tensor(particle_i, i, j)*density; //particles_inertia_tensor is computed without density in Transport_Interfaces_FT_Disc
-              std::cout<<Ji(i,j)<<" ";
             }
-          std::cout<<std::endl;
         }
 
       for (int ind_particle_j =ind_start_part_j; ind_particle_j < nb_particles_j; ind_particle_j++)
         {
-          dX = 0;
+          dX = 0.;
           dU = 0;
-          norm = 0;
+          norm = 0.;
+          double dist_between_particles = std::numeric_limits<double>::max();
           int particle_j=get_particle_j(ind_particle_i,ind_particle_j);
+          std::cout<<"                    Je suis le proc "<<Process::me()<<" et j "<<particle_j<<" part_j"<<std::endl;
           int is_particle_particle_collision = particle_j < nb_particles_tot_;
           collision_parameters param;
-          param.particle_i = particle_i;
-          param.particle_j = particle_j;
+          if(!( (is_particle_particle_collision && compo_sommets[particle_j].size()==0) || compo_sommets[particle_i].size()==0))  //particle_j has no vertex in the local proc, so we continue
+            {
+              param.particle_i = particle_i;
+              param.particle_j = particle_j;
 
 
-          compute_dX(dX, param, particles_position, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
-          if(is_particle_particle_collision)
-            {
-              compute_norm(norm, param, sommets_facets, mesh);
-            }
-          else
-            {
-              int ind_wall = particle_j - nb_particles_tot_;
-              int ori = ind_wall < dimension ? ind_wall : ind_wall - dimension;
-              norm(ori) = (ind_wall < 3 ? 1 : -1); //La normale correspond à la normale à la paroi (seuls les parallélépipèdes sont considérés)
-            }
+              compute_dX(dX, param, particles_position, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
+              if(is_particle_particle_collision)
+                {
+                  compute_norm(norm, param, sommets_facets, mesh);
+                }
+              else
+                {
+                  int ind_wall = particle_j - nb_particles_tot_;
+                  int ori = ind_wall < dimension ? ind_wall : ind_wall - dimension;
+                  norm(ori) = (ind_wall < 3 ? 1 : -1); //La normale correspond à la normale à la paroi (seuls les parallélépipèdes sont considérés)
+                }
 
-          double dist_between_particles = 0.;
-          if(is_particle_particle_collision)
-            {
-              dist_between_particles = -local_prodscal(dX,norm); //normal penetration distance
-            }
-          else
-            {
-              double dist_gravity_center = sqrt(local_carre_norme_vect(dX));//project on normal ?? XXX
-              dist_between_particles = dist_gravity_center - activation_distance_ ;
-            }
 
+              if(is_particle_particle_collision)
+                {
+                  dist_between_particles = -local_prodscal(dX,norm); //normal penetration distance
+                }
+              else
+                {
+                  double dist_gravity_center = sqrt(local_carre_norme_vect(dX));//project on normal ?? XXX
+                  dist_between_particles = dist_gravity_center - activation_distance_ ;
+                }
+            }
           // Check if the current proc is the one that has to compute the force
-
+          DoubleTab dist(1); //can use mp_min_for_each_item only with TRUSTArray
+          dist(0) = dist_between_particles;
+          mp_min_for_each_item(dist);
+          // std::cout<<"["<<Process::me()<<"] : "<<"min  : "<<dist(0)<<" my distance : "<<dist_between_particles<<std::endl;
+          if(dist(0)!=dist_between_particles) continue;
 
 
           std::cout<<"["<<Process::me()<<"] : "<<"finished compute dx du normal "<<is_particle_particle_collision<<std::endl;
@@ -688,12 +695,12 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           fd.open(path, std::ios::app);
           std::ofstream f_cp;
           // XXX debug files
-          std::ofstream f;
-          path = fichier_debug + "_closest_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
-          f_cp.open(path, std::ios::app);
-          if(particle_j - nb_particles_tot_==1) //ground
-            f_cp<<t<<" "<<collision_point(0)<<" "<<collision_point(1)<<" "<<collision_point(2)<<"\n";
-          f_cp.close();
+          // std::ofstream f;
+          // path = fichier_debug + "_closest_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
+          // f_cp.open(path, std::ios::app);
+          // if(particle_j - nb_particles_tot_==1) //ground
+          //   f_cp<<t<<" "<<collision_point(0)<<" "<<collision_point(1)<<" "<<collision_point(2)<<"\n";
+          // f_cp.close();
 
 
 
@@ -703,8 +710,10 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
             {
 
               compute_dU_cp(dU, collision_point, param, is_particle_particle_collision, compo_sommets, part_prop, mesh);
-
-              std::cout<<"["<<Process::me()<<"] : "<<"Collision detected !!!!"<<std::endl;
+              std::ofstream fcol;
+              path = fichier_debug + "is_collision_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
+              fcol.open(path, std::ios::app);
+              fcol<<t<<" ["<<Process::me()<<"] : "<<"Collision detected !!!!"<<std::endl;
               max_dist = std::max(max_dist, -dist_between_particles);
 
               if(is_particle_particle_collision) {dist_between_particles*=-1;}
