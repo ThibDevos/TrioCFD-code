@@ -44,6 +44,7 @@ Sortie& Collision_Model_FT_base::printOn(Sortie& os) const
 
 void Collision_Model_FT_base::set_param(Param& p)
 {
+  p.ajouter_non_std("octree_option", (this),Param::REQUIRED); // XD_ADD_P chaine name of the collision model
   p.ajouter_non_std("collision_model", (this),Param::REQUIRED); // XD_ADD_P chaine name of the collision model
   p.ajouter_non_std("detection_method", (this),Param::REQUIRED); // XD_ADD_P chaine method to detect collisions
   p.ajouter_non_std("collision_detection", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision detection when using FT
