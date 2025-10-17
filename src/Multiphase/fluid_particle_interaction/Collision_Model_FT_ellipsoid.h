@@ -21,16 +21,19 @@
 #include <Octree_Double.h>
 #include <fstream>
 
-
 struct collision_parameters
 {
-  int particle_i;
-  int particle_j;
-  int i_closest;
-  int j_closest;
+  int particle_i =-1;
+  int particle_j =-1;
+  int i_closest =-1;
+  int j_closest =-1;
   bool i_facet = false;
   bool j_facet = false;
   bool i_j_are_close = false;
+  bool part_part_collision = false;
+  DoubleTab dX;
+  collision_parameters(int dimension) {dX.resize(dimension);}
+  collision_parameters() {dX.resize(3);}
 };
 
 /*! @brief : class Collision_Model_FT
@@ -50,6 +53,8 @@ class Collision_Model_FT_ellipsoid : public Collision_Model_FT_base
   Declare_instanciable_sans_constructeur(Collision_Model_FT_ellipsoid);
 
 public:
+
+
   void test_connex_compo(Maillage_FT_Disc const& maillage);
   Collision_Model_FT_ellipsoid();
   int lire_motcle_non_standard(const Motcle&, Entree&) override;
@@ -60,14 +65,21 @@ public:
                       const Schema_Comm& schema_comm_FT);
   void compute_fictive_wall_coordinates(const double& radius);
   void  collision_point(Maillage_FT_Disc const& maillage, int i_closest, int j_closest, bool i_fa7, bool j_fa7, DoubleTab& xc);
+
   void deepest_points(IntLists const& compo_sommets, IntLists const& sommets_facets, Maillage_FT_Disc const& mesh, collision_parameters& param,
                       DoubleTab const& positions, bool check_cg, DoubleTab& dX);
+
   void closest_nodes(IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, collision_parameters& param,
                      DoubleTab& dX, bool chek_cg);
   void closest_nodes(IntLists const& compo_sommets,const ArrOfInt& compo_connexes_fa7, const IntLists& compo_connexe_facets, Maillage_FT_Disc const& mesh, collision_parameters& param,
                      DoubleTab& dX, bool chek_cg, const Octree_Double& octree);
+
   void normal_i(Maillage_FT_Disc const& mesh, IntLists const& sommets_facets, collision_parameters& param, DoubleTab& n);
   void normal_average_ij(Maillage_FT_Disc const& mesh,IntLists const& sommets_facets, collision_parameters& param, DoubleTab& n);
+  void compute_dX_boundary(collision_parameters& param, IntLists const& compo_sommets, const Maillage_FT_Disc& mesh);
+  void detect_collision(int part_i, std::vector<collision_parameters>& col_param, int nb_part_j, int start_j, const Octree_Double& octree, IntLists const& compo_sommets,
+                        const ArrOfInt& compo_connexes_fa7, const Maillage_FT_Disc& mesh);
+
   void compute_dX_dU_normal(DoubleTab& dX, DoubleTab& dU, DoubleTab& norm, DoubleTab& cp, const int particle,
                             const int neighbor, const DoubleTab& particles_position, const DoubleTab& particles_velocity, const DoubleTab& particles_rot_velocity, const bool is_particle_particle_collision,
                             const IntLists& compo_sommets, const IntLists& sommets_facets, const Maillage_FT_Disc& mesh);
