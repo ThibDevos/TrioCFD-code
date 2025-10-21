@@ -746,10 +746,12 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
       std::vector<collision_parameters> collisions_param;
       collisions_param.resize(nb_particles_j);
-
-      begin = std::chrono::steady_clock::now();
-      detect_collision(particle_i, collisions_param, nb_particles_j, ind_start_part_j, octree, compo_sommets, compo_connexes_fa7, mesh);
-      end = std::chrono::steady_clock::now();
+      if(octree_option==Octree_Option::ONE)
+        {
+          begin = std::chrono::steady_clock::now();
+          detect_collision(particle_i, collisions_param, nb_particles_j, ind_start_part_j, octree, compo_sommets, compo_connexes_fa7, mesh);
+          end = std::chrono::steady_clock::now();
+        }
 
       Matrice_Dense Ji(dimension, dimension);
       DoubleTab ri(dimension);
@@ -772,56 +774,54 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           norm = 0.;
           double dist_between_particles = std::numeric_limits<double>::max();
           int particle_j=get_particle_j(ind_particle_i,ind_particle_j);
-          int is_particle_particle_collision = collisions_param[ind_particle_j].part_part_collision;
-          collision_parameters param;
-          param.particle_i = particle_i;
-          param.particle_j = particle_j;
-
-
-
-
           if(octree_option == Octree_Option::NONE)
             {
-              begin = std::chrono::steady_clock::now();
-              compute_dX(dX, param, particles_position, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
-              end = std::chrono::steady_clock::now();
+              collisions_param[ind_particle_j].part_part_collision = particle_j < nb_particles_tot_;
             }
-          else
-            {
-              // begin = std::chrono::steady_clock::now();
-              // compute_dX_octree(dX, param, particles_position, is_particle_particle_collision, compo_sommets, sommets_facets, compo_connexes_fa7, compo_connexe_facets, mesh, octree);
-              // end = std::chrono::steady_clock::now();
-            }
+          int is_particle_particle_collision = collisions_param[ind_particle_j].part_part_collision;
+          collisions_param[ind_particle_j].particle_i = particle_i;
+          collisions_param[ind_particle_j].particle_j = particle_j;
 
-          if(is_particle_particle_collision)
+
+          if(!( (is_particle_particle_collision && compo_sommets[particle_j].size()==0) || compo_sommets[particle_i].size()==0))  //particle_j has no vertex in the local proc, so we continue
             {
-              if(collisions_param[ind_particle_j].i_j_are_close)
+
+              if(octree_option == Octree_Option::NONE)
                 {
-                  compute_norm(norm, collisions_param[ind_particle_j], sommets_facets, mesh);
+                  begin = std::chrono::steady_clock::now();
+                  compute_dX(collisions_param[ind_particle_j].dX, collisions_param[ind_particle_j], particles_position, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
+                  end = std::chrono::steady_clock::now();
+                }
+
+              if(is_particle_particle_collision)
+                {
+                  if(collisions_param[ind_particle_j].i_j_are_close)
+                    {
+                      compute_norm(norm, collisions_param[ind_particle_j], sommets_facets, mesh);
+                    }
+                }
+              else
+                {
+                  int ind_wall = particle_j - nb_particles_tot_;
+                  int ori = ind_wall < dimension ? ind_wall : ind_wall - dimension;
+                  norm(ori) = (ind_wall < 3 ? 1 : -1); //La normale correspond à la normale à la paroi (seuls les parallélépipèdes sont considérés)
+
+                }
+
+
+              if(is_particle_particle_collision)
+                {
+                  if(collisions_param[ind_particle_j].i_j_are_close)
+                    {
+                      dist_between_particles = -local_prodscal(collisions_param[ind_particle_j].dX,norm); //normal penetration distance
+                    }
+                }
+              else
+                {
+                  double dist_gravity_center = sqrt(local_carre_norme_vect(collisions_param[ind_particle_j].dX));//project on normal ?? XXX
+                  dist_between_particles = dist_gravity_center - activation_distance_ ;
                 }
             }
-          else
-            {
-              int ind_wall = particle_j - nb_particles_tot_;
-              int ori = ind_wall < dimension ? ind_wall : ind_wall - dimension;
-              norm(ori) = (ind_wall < 3 ? 1 : -1); //La normale correspond à la normale à la paroi (seuls les parallélépipèdes sont considérés)
-
-            }
-
-
-          if(is_particle_particle_collision)
-            {
-              if(collisions_param[ind_particle_j].i_j_are_close)
-                {
-                  dist_between_particles = -local_prodscal(collisions_param[ind_particle_j].dX,norm); //normal penetration distance
-                }
-            }
-          else
-            {
-              double dist_gravity_center = sqrt(local_carre_norme_vect(collisions_param[ind_particle_j].dX));//project on normal ?? XXX
-              dist_between_particles = dist_gravity_center - activation_distance_ ;
-            }
-
           std::ofstream ffn, fft, fm, fu, fd, ft;
           std::string path;
           path = fichier_debug + "normal_force_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
@@ -851,7 +851,8 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           double max_dist = 0.;
           if (dist_between_particles <= 0) // contact
             {
-              std::cout<<"Coliision detected"<<std::endl;
+              std::cout<<"Coliision detected "<<is_particle_particle_collision<<" "<<dist_between_particles<<std::endl;
+              std::cout<<dX(0)<<" "<<std::endl;
               compute_dU_cp(dU, collision_point, collisions_param[ind_particle_j], is_particle_particle_collision, compo_sommets, part_prop, mesh);
               std::cout<<"Computed du cp"<<std::endl;
               std::ofstream fcol;
