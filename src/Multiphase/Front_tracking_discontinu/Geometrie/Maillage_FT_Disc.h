@@ -229,6 +229,9 @@ public:
 
   const DoubleTab& get_gravity_center_fa7() const { return gravity_center_fa7_; }
   void compute_gravity_center_fa7();
+  void compute_mesh_size() const;
+  double get_local_mesh_size() const {return local_mesh_size;}
+  double get_global_mesh_size() const {return global_mesh_size;}
 protected:
   void pre_lissage_courbure(ArrOfDouble& store_courbure_sommets, const int niter) const;
   void correction_costheta(const double c, const int s0, const int facette,
@@ -482,6 +485,8 @@ protected:
   enum enum_methode_calcul_courbure_contact_line_ { STANDARD=0, MIRROR=1, IMPROVED=2, none=3, WEIGHTED=4, HYSTERESIS=5 };
   int methode_calcul_courbure_contact_line_;
   double weight_CL_;
+  mutable double local_mesh_size;
+  mutable double global_mesh_size;
 
   bool is_solid_particle_=false; // for fpi module, pointer to NS_FT_Disc::is_solid_particle_
   DoubleTab gravity_center_fa7_; // EB

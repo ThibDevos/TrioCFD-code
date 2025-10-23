@@ -322,7 +322,7 @@ void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, 
   auto sommets = mesh.sommets();
   auto facets = mesh.facettes();
   ArrOfInt liste_facettes;
-  double distmax = 1e-5;
+  double distmax = mesh.get_global_mesh_size();
   double dist_cg=0;
   double dX_min_norm=std::numeric_limits<double>::max();
   DoubleTab coord(dimension);
@@ -707,6 +707,8 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   auto particles_volume = part_prop.volume;
 
   auto facets = mesh.facettes();
+  int nb_tot_facets = mesh.nb_facettes_totale();
+  mesh.compute_mesh_size();
 
   const double& e_dry=solid_particle.get_e_dry();
   const double min_threshold=1e-10;
@@ -736,6 +738,12 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   if(octree_option==Octree_Option::ONE)
     {
       octree.build_elements(mesh.sommets(), mesh.facettes(),0.,0);
+    }
+  if(Process::me()==0)
+    {
+      std::ofstream f;
+      f.open("nb_facettes.txt");
+      f<<nb_tot_facets<<" "<<mesh.get_global_mesh_size();
     }
 
   for (int ind_particle_i = 0; ind_particle_i < nb_real_particles_; ind_particle_i++)
