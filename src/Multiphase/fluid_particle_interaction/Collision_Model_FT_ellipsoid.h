@@ -78,7 +78,7 @@ public:
   void normal_average_ij(Maillage_FT_Disc const& mesh,IntLists const& sommets_facets, collision_parameters& param, DoubleTab& n);
   void compute_dX_boundary(collision_parameters& param, IntLists const& compo_sommets, const Maillage_FT_Disc& mesh);
   void detect_collision(int part_i, std::vector<collision_parameters>& col_param, int nb_part_j, int start_j, const Octree_Double& octree, IntLists const& compo_sommets,
-                        const ArrOfInt& compo_connexes_fa7, const Maillage_FT_Disc& mesh);
+                        const ArrOfInt& compo_connexes_fa7, const ArrOfInt& compo_connexes_sommets, const Maillage_FT_Disc& mesh);
 
   void compute_dX_dU_normal(DoubleTab& dX, DoubleTab& dU, DoubleTab& norm, DoubleTab& cp, const int particle,
                             const int neighbor, const DoubleTab& particles_position, const DoubleTab& particles_velocity, const DoubleTab& particles_rot_velocity, const bool is_particle_particle_collision,
@@ -124,8 +124,8 @@ private:
   Collision_detection collision_detection_ = Collision_detection::DEEPEST;
   enum class Collision_normal {NORMAL_I, NORMAL_IJ};
   Collision_normal collision_normal_ = Collision_normal::NORMAL_IJ;
-  enum class Octree_Option {NONE, ONE, ALL};
-  Octree_Option octree_option = Octree_Option::ONE;
+  enum class Octree_Option {NONE, SOMMETS, FACETTES};
+  Octree_Option octree_option = Octree_Option::SOMMETS;
   // XXX debug
   Motcle fichier_debug;
 };

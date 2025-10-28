@@ -72,8 +72,8 @@ int Collision_Model_FT_ellipsoid::lire_motcle_non_standard(const Motcle& word, E
     {
       Motcles words;
       words.add("none");
-      words.add("one");
-      words.add("all");
+      words.add("sommets");
+      words.add("facettes");
       Motcle secondword;
       is >> secondword;
       const int r = words.search(secondword);
@@ -83,10 +83,10 @@ int Collision_Model_FT_ellipsoid::lire_motcle_non_standard(const Motcle& word, E
           octree_option = Octree_Option::NONE;
           break;
         case 1 :
-          octree_option = Octree_Option::ONE;
+          octree_option = Octree_Option::SOMMETS;
           break;
         case 2 :
-          octree_option = Octree_Option::ALL;
+          octree_option = Octree_Option::FACETTES;
           break;
         default:
           Cerr << "Error " << words << "was expected whereas " << secondword <<
@@ -339,7 +339,7 @@ void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, 
       for(int j=0; j<nliste; ++j) //loop on the facets
         {
           int num_facette = 0;
-          if(octree_option == Octree_Option::ONE)
+          if(octree_option != Octree_Option::NONE)
             {
               num_facette = liste_facettes[j];
               if(compo_connexes_fa7(num_facette) != param.particle_j) continue; //if facet does not belong to compo j, we don't need to check
@@ -603,7 +603,7 @@ void Collision_Model_FT_ellipsoid::compute_dX_boundary(collision_parameters& par
 }
 
 void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<collision_parameters>& col_param, int nb_part_j, int start_j, const Octree_Double& octree, IntLists const& compo_sommets,
-                                                    const ArrOfInt& compo_connexes_fa7, const Maillage_FT_Disc& mesh)
+                                                    const ArrOfInt& compo_connexes_fa7, const ArrOfInt& compo_connexes_sommets, const Maillage_FT_Disc& mesh)
 {
   //initialization
   DoubleTab dX_min_norm(nb_part_j);
@@ -623,35 +623,77 @@ void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<coll
   DoubleTab dX_min(nb_part_j, dimension);
   DoubleTab coord(dimension);
   ArrOfInt liste_facettes;
+  ArrOfInt liste_sommets;
   int num_facette = -1;
+  int num_sommet = -1;
   int num_compo_j = -1;
   double dist = 0.;
+  double distmax = mesh.get_global_mesh_size();
   for (int i = 0; i < compo_sommets[part_i].size(); ++i) //loop on all the vertices of the compo i
     {
-      int i_global = compo_sommets[part_i][i];
-      double distmax = 1e-5; // XXX Need to change this as a function of the mesh size !!!
-      for(int d=0; d<dimension; ++d)
-        coord(d) = sommets(i_global, d);
-      octree.search_elements_box(coord[0] - distmax, coord[1] - distmax, coord[2] - distmax, coord[0] + distmax,
-                                 coord[1] + distmax, coord[2] + distmax, liste_facettes); // get the list of facets that are in a box centered at coord and of size distmax*2
-      for(int f = 0; f<liste_facettes.size_array(); ++f)
+      if (octree_option == Octree_Option::FACETTES)
         {
-          num_facette = liste_facettes[f];
-          num_compo_j = compo_connexes_fa7(num_facette);
-          int loc_compo_j = mapping_partj_idloc[num_compo_j];
-          if(loc_compo_j < start_j) continue;
-          // std::cout<<"did not continue"<<std::endl;
-          // exit(0);
-          for(int v=0; v<3; ++v) //loop on the vertices of the facet
+          int i_global = compo_sommets[part_i][i];
+          for (int d = 0; d < dimension; ++d)
+            coord(d) = sommets(i_global, d);
+          octree.search_elements_box(coord[0] - distmax, coord[1] - distmax, coord[2] - distmax, coord[0] + distmax,
+                                     coord[1] + distmax, coord[2] + distmax, liste_facettes); // get the list of facets that are in a box centered at coord and of size distmax*2
+          for (int f = 0; f < liste_facettes.size_array(); ++f)
             {
-              for(int d=0; d<dimension; ++d)
+              num_facette = liste_facettes[f];
+              num_compo_j = compo_connexes_fa7(num_facette);
+              int loc_compo_j = mapping_partj_idloc[num_compo_j];
+              if (loc_compo_j < start_j)
+                continue;
+              // std::cout<<"did not continue"<<std::endl;
+              // exit(0);
+              for (int v = 0; v < 3; ++v) // loop on the vertices of the facet
                 {
-                  dX_loc(d) = coord[d] - sommets(facets(num_facette,v),d);
+                  for (int d = 0; d < dimension; ++d)
+                    {
+                      dX_loc(d) = coord[d] - sommets(facets(num_facette, v), d);
+                    }
+                  dist = local_carre_norme_vect(dX_loc);
+                  if (dist < dX_min_norm[loc_compo_j])
+                    {
+                      std::cout << "new couple " << i_global << " " << facets(num_facette, v) << " for particles " << part_i << " and " << num_compo_j << std::endl;
+                      for (int d = 0; d < dimension; ++d)
+                        {
+                          dX_min(loc_compo_j, d) = dX_loc(d);
+                        }
+                      dX_min_norm[loc_compo_j] = dist;
+
+                      col_param[loc_compo_j].i_closest = i_global;
+                      col_param[loc_compo_j].j_closest = facets(num_facette, v);
+                      col_param[loc_compo_j].i_j_are_close = true;
+                    }
+                }
+            }
+        }
+      if (octree_option == Octree_Option::SOMMETS)
+        {
+          std::cout<<"check here"<<std::endl;
+          int i_global = compo_sommets[part_i][i];
+          for (int d = 0; d < dimension; ++d)
+            coord(d) = sommets(i_global, d);
+          octree.search_elements_box(coord[0] - distmax, coord[1] - distmax, coord[2] - distmax, coord[0] + distmax,
+                                     coord[1] + distmax, coord[2] + distmax, liste_sommets); // get the list of facets that are in a box centered at coord and of size distmax*2
+          for (int s = 0; s < liste_sommets.size_array(); ++s)
+            {
+              num_sommet = liste_sommets[s];
+              num_compo_j = compo_connexes_sommets(num_sommet);
+              int loc_compo_j = mapping_partj_idloc[num_compo_j];
+              if (loc_compo_j < start_j)
+                continue;
+
+              for (int d = 0; d < dimension; ++d)
+                {
+                  dX_loc(d) = coord[d] - sommets(num_sommet, d);
                 }
               dist = local_carre_norme_vect(dX_loc);
               if (dist < dX_min_norm[loc_compo_j])
                 {
-                  std::cout<<"new couple "<<i_global<<" "<<facets(num_facette,v)<<" for particles "<<part_i<<" and "<<num_compo_j<<std::endl;
+                  std::cout << "new couple " << i_global << " " << num_sommet << " for particles " << part_i << " and " << num_compo_j << std::endl;
                   for (int d = 0; d < dimension; ++d)
                     {
                       dX_min(loc_compo_j, d) = dX_loc(d);
@@ -659,8 +701,8 @@ void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<coll
                   dX_min_norm[loc_compo_j] = dist;
 
                   col_param[loc_compo_j].i_closest = i_global;
-                  col_param[loc_compo_j].j_closest = facets(num_facette,v);
-                  col_param[loc_compo_j].i_j_are_close  = true;
+                  col_param[loc_compo_j].j_closest = num_sommet;
+                  col_param[loc_compo_j].i_j_are_close = true;
                 }
             }
         }
@@ -720,6 +762,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   collision_number_=0;
   particles_collision_number_=0;
 
+  /*--------------all these functions should be refactored as search_connex_components_local_FT and compute_global_connex_components_FT are called in each one*/
   test_connex_compo(mesh);
   IntLists compo_sommets; //compo_sommet[i] contient les indices des sommets (dans le proc) composant la compo i
   connec_compo_sommets(mesh, compo_sommets);
@@ -731,11 +774,19 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   compute_global_connex_components_FT(mesh, compo_connexes_fa7, n);
   IntLists compo_connexe_facets;
   connec_compo_facettes(mesh, compo_connexe_facets); //compo_connexe_facets[i] contient les indices des facettes composant la compo i
+  ArrOfInt compo_connecs_sommets;
+  compo_connexe_sommets(mesh, compo_connecs_sommets);
   Octree_Double octree;
   //XXX check time
   std::chrono::steady_clock::time_point begin;
   std::chrono::steady_clock::time_point end;
-  if(octree_option==Octree_Option::ONE)
+  if(octree_option==Octree_Option::SOMMETS)
+    {
+      std::cout<<"build octree"<<std::endl;
+      octree.build_elements(mesh.sommets(), 0.,0);
+      std::cout<<"octree built"<<std::endl;
+    }
+  else if(octree_option==Octree_Option::FACETTES)
     {
       octree.build_elements(mesh.sommets(), mesh.facettes(),0.,0);
     }
@@ -754,11 +805,9 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
       std::vector<collision_parameters> collisions_param;
       collisions_param.resize(nb_particles_j);
-      if(octree_option==Octree_Option::ONE)
+      if(octree_option!=Octree_Option::NONE)
         {
-          begin = std::chrono::steady_clock::now();
-          detect_collision(particle_i, collisions_param, nb_particles_j, ind_start_part_j, octree, compo_sommets, compo_connexes_fa7, mesh);
-          end = std::chrono::steady_clock::now();
+          detect_collision(particle_i, collisions_param, nb_particles_j, ind_start_part_j, octree, compo_sommets, compo_connexes_fa7, compo_connecs_sommets, mesh);
         }
 
       Matrice_Dense Ji(dimension, dimension);
