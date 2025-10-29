@@ -1037,7 +1037,7 @@ void Collision_Model_FT_ellipsoid::output_orientation(const DoubleTab& particles
     }
 
 }
-//XXX Inertia not a ref to debug only
+//XXX Inertia not a ref because .inverse() modify the object
 DoubleTab Collision_Model_FT_ellipsoid::compute_contact_moment(Matrice_Dense Inertia, DoubleTab const& force, DoubleTab const& r, DoubleTab const& Omega)
 // DoubleTab Collision_Model_FT_ellipsoid::compute_contact_moment(Matrice_Dense& Inertia, DoubleTab const& force, DoubleTab const& r, DoubleTab const& Omega)
 {
@@ -1071,7 +1071,8 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   const particle_properties& part_prop)
 {
   static int t=0;
-  const DoubleTab om = part_prop.rot_velocity;
+  const DoubleTab Omega = part_prop.rot_velocity;
+  DoubleTab Omega_i(dimension);
   const DoubleTab v = part_prop.velocity;
   const DoubleVect& interlaced_volumes=domain_vf.volumes_entrelaces();
   const DoubleTab& cg_faces=domain_vf.xv();
@@ -1080,8 +1081,12 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
   const IntTab& face_voisins=domain_vf.face_voisins();
   double max_force = 0.;
   double max_moment = 0.;
-  DoubleTab omr(dimension);
-  bool collision = false; // if no collision, we don't apply centrifugal force
+  DoubleTab Omega_r(dimension);
+  DoubleTab OmegaJOmgea(dimension);
+  DoubleTab inertia(dimension);
+  auto particles_inertia_tensor = part_prop.inertia_tensor;
+  Matrice_Dense Ji(dimension, dimension);
+  // bool collision = false; // if no collision, we don't apply centrifugal force
   for (int face=0; face<nb_faces; face++)
     {
       const int left_elem=face_voisins(face,0);
@@ -1091,19 +1096,36 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
       const int id_number=std::max(id_left,id_right);
       if (id_number!=-1)
         {
-          if(lagrangian_contact_forces_(id_number,0)!=0 || lagrangian_contact_forces_(id_number,1)!=0 || lagrangian_contact_forces_(id_number,2)!=0) {collision = true;}
+          // if(lagrangian_contact_forces_(id_number,0)!=0 || lagrangian_contact_forces_(id_number,1)!=0 || lagrangian_contact_forces_(id_number,2)!=0) {collision = true;}
           const int ori=orientation(face);
 
+          for(int i=0; i<dimension; ++i)
+            {
+              Omega_i(i) = Omega(id_number, i);
+              inertia(i) = 0.;
+              for(int j=0; j<dimension; ++j)
+                {
+                  if(std::fabs(particles_inertia_tensor(id_number, i, j))>1e-15)
+                    Ji(i,j) = particles_inertia_tensor(id_number, i, j)*part_prop.density; //particles_inertia_tensor is computed without density in Transport_Interfaces_FT_Disc
+                }
+            }
+          DoubleTab InertiaOmega(dimension);
+          Ji.ajouter_multvect_(Omega_i,InertiaOmega);
           for(int d=0; d<dimension; ++d)
             {
-              omr(d) = om(id_number,(d+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) - om(id_number,(d+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) );
+              Omega_r(d) = Omega_i((d+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) - Omega_i((d+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) );
+              OmegaJOmgea(d) = Omega_i((d+1)%3) * InertiaOmega((d+2)%3) - Omega_i((d+2)%3) * InertiaOmega((d+1)%3);
             }
+          Ji.inverse();//Ji is now its inverse
+          Ji.ajouter_multvect_(OmegaJOmgea,inertia);
+
 
           contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
                                           *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori)
                                                                      + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
                                                                         lagrangian_contact_moments_(id_number,(ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) )) +
-                                                                     collision * part_prop.density * ( om((ori+1)%3) * omr((ori+2)%3) - om((ori+2)%3) * omr((ori+1)%3)));
+                                                                     /*collision **/ part_prop.density * ( Omega_i((ori+1)%3) * Omega_r((ori+2)%3) - Omega_i((ori+2)%3) * Omega_r((ori+1)%3) +
+                                                                                                           inertia(ori)));
         }
     }
   std::ofstream f,g;
