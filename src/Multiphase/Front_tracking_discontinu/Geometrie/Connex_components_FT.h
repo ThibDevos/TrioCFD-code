@@ -24,7 +24,7 @@ int search_connex_components_local_FT(const Maillage_FT_Disc& mesh, ArrOfInt& nu
                                       const int include_virtual=0);
 
 int compute_global_connex_components_FT(const Maillage_FT_Disc& mesh, ArrOfInt& num_compo, int nb_local_components);
-void compo_connexe_sommets(Maillage_FT_Disc const& maillage, ArrOfInt& compo_connec_sommets);
+void compo_connexe_sommets(Maillage_FT_Disc const& maillage, ArrOfInt const& compo_connexes_fa7,  ArrOfInt& compo_connec_sommets);
 void connec_compo_sommets(Maillage_FT_Disc const&, IntLists&);
 void connec_compo_facettes(Maillage_FT_Disc const&, IntLists& );
 void connec_sommets_fa7(Maillage_FT_Disc const& , IntLists& );
