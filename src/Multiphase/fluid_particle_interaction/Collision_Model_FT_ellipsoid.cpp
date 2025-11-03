@@ -310,6 +310,9 @@ void Collision_Model_FT_ellipsoid::closest_nodes(IntLists const& compo_sommets, 
             }
         }
     }
+  std::ofstream f;
+  f.open("closest_points.txt", std::ios::app);
+  f<<param.i_closest<<" "<<param.j_closest<<std::endl;
   for (int d = 0; d < dimension; ++d)
     {
       dX(d) = dX_min(d);
@@ -628,7 +631,7 @@ void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<coll
   int num_sommet = -1;
   int num_compo_j = -1;
   double dist = 0.;
-  double distmax = mesh.get_global_mesh_size()*2.;
+  double distmax = mesh.get_global_mesh_size();
   for (int i = 0; i < compo_sommets[part_i].size(); ++i) //loop on all the vertices of the compo i
     {
       if (octree_option == Octree_Option::FACETTES)
@@ -656,7 +659,7 @@ void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<coll
                   dist = local_carre_norme_vect(dX_loc);
                   if (dist < dX_min_norm[loc_compo_j])
                     {
-                      std::cout << "new couple " << i_global << " " << facets(num_facette, v) << " for particles " << part_i << " and " << num_compo_j << std::endl;
+                      // std::cout << "new couple " << i_global << " " << facets(num_facette, v) << " for particles " << part_i << " and " << num_compo_j << std::endl;
                       for (int d = 0; d < dimension; ++d)
                         {
                           dX_min(loc_compo_j, d) = dX_loc(d);
@@ -682,11 +685,9 @@ void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<coll
             {
               num_sommet = liste_sommets[s];
               num_compo_j = compo_connexes_sommets(num_sommet);
-              if(i_global==84 && num_sommet==300) {std::cout<<"300 is here !!!"<<std::endl;}
               int loc_compo_j = mapping_partj_idloc[num_compo_j];
               if (loc_compo_j < start_j)
                 continue;
-
               for (int d = 0; d < dimension; ++d)
                 {
                   dX_loc(d) = coord[d] - sommets(num_sommet, d);
@@ -694,7 +695,7 @@ void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<coll
               dist = local_carre_norme_vect(dX_loc);
               if (dist < dX_min_norm[loc_compo_j])
                 {
-                  std::cout << "new couple " << i_global << " " << num_sommet << " for particles " << part_i << " and " << num_compo_j << std::endl;
+                  // std::cout << "new couple " << i_global << " " << num_sommet << " for particles " << part_i << " and " << num_compo_j << std::endl;
                   for (int d = 0; d < dimension; ++d)
                     {
                       dX_min(loc_compo_j, d) = dX_loc(d);
@@ -708,23 +709,9 @@ void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<coll
             }
 
         }
-      double dx_min_jj = 1e31;
-      int jj = -1;
-      for(int j=0; j<compo_sommets[1].size(); ++j)
-        {
-          for (int d = 0; d < dimension; ++d)
-            {
-              dX_loc(d) = sommets(compo_sommets[part_i][i], d) - sommets(compo_sommets[1][j], d);
-            }
-          dist = local_carre_norme_vect(dX_loc);
-          if(dist<dx_min_jj)
-            {
-              dx_min_jj = dist;
-              jj = compo_sommets[1][j];
-            }
-        }
-      if((jj!=col_param[1].j_closest)&&col_param[1].j_closest>-1) {std::cout<<compo_sommets[part_i][i]<<" "<<jj<<" "<<col_param[1].j_closest<<std::endl; exit(0);}
+
     }
+
   for(int loc_compo_j = start_j; loc_compo_j<nb_part_j; ++loc_compo_j)
     {
       if(!col_param[loc_compo_j].part_part_collision) continue;
@@ -800,9 +787,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   std::chrono::steady_clock::time_point end;
   if(octree_option==Octree_Option::SOMMETS)
     {
-      std::cout<<"build octree"<<std::endl;
-      octree.build_elements(mesh.sommets(), 0.,0);
-      std::cout<<"octree built"<<std::endl;
+      octree.build_nodes(mesh.sommets(), 0.,0);
     }
   else if(octree_option==Octree_Option::FACETTES)
     {

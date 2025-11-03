@@ -6582,5 +6582,6 @@ void Maillage_FT_Disc::compute_mesh_size() const
           local_mesh_size = h > local_mesh_size ? h : local_mesh_size;
         }
     }
+  local_mesh_size = sqrt(local_mesh_size);
   global_mesh_size = Process::mp_max(local_mesh_size);
 }
