@@ -692,10 +692,10 @@ void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<coll
                 {
                   dX_loc(d) = coord[d] - sommets(num_sommet, d);
                 }
-              dist = local_carre_norme_vect(dX_loc);
+              dist = sqrt(local_carre_norme_vect(dX_loc));
               if (dist < dX_min_norm[loc_compo_j])
                 {
-                  // std::cout << "new couple " << i_global << " " << num_sommet << " for particles " << part_i << " and " << num_compo_j << std::endl;
+                  std::cout << "new couple " << i_global << " " << num_sommet << " for particles " << part_i << " and " << num_compo_j << std::endl;
                   for (int d = 0; d < dimension; ++d)
                     {
                       dX_min(loc_compo_j, d) = dX_loc(d);
@@ -781,13 +781,28 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   connec_compo_facettes(mesh, compo_connexe_facets); //compo_connexe_facets[i] contient les indices des facettes composant la compo i
   ArrOfInt compo_connecs_sommets(mesh.sommets().dimension(0));
   compo_connexe_sommets(mesh, compo_connexes_fa7, compo_connecs_sommets);
+
+
+
   Octree_Double octree;
   //XXX check time
-  std::chrono::steady_clock::time_point begin;
-  std::chrono::steady_clock::time_point end;
+  std::chrono::steady_clock::time_point begin_octree;
+  std::chrono::steady_clock::time_point end_octree;
+  std::chrono::steady_clock::time_point begin_MLO;
+  std::chrono::steady_clock::time_point end_MLO;
+  auto time_octree =  std::chrono::duration_cast<std::chrono::nanoseconds>(end_octree - begin_octree).count();
+  auto time_mlo = std::chrono::duration_cast<std::chrono::nanoseconds>(end_MLO - begin_MLO).count();
+  std::cout<<"MORTON CODE"<<std::endl;
+  begin_MLO = std::chrono::steady_clock::now();
+  Morton_Linear_Octree_Particles MLO(mesh.sommets(), mesh.get_global_mesh_size(), compo_connecs_sommets);
+  end_MLO = std::chrono::steady_clock::now();
+  time_mlo += std::chrono::duration_cast<std::chrono::nanoseconds>(end_MLO - begin_MLO).count();
   if(octree_option==Octree_Option::SOMMETS)
     {
+      begin_octree = std::chrono::steady_clock::now();
       octree.build_nodes(mesh.sommets(), 0.,0);
+      end_octree = std::chrono::steady_clock::now();
+      time_octree+= std::chrono::duration_cast<std::chrono::nanoseconds>(end_octree - begin_octree).count();
     }
   else if(octree_option==Octree_Option::FACETTES)
     {
@@ -799,6 +814,51 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
       f.open("nb_facettes.txt");
       f<<nb_tot_facets<<" "<<mesh.get_global_mesh_size();
     }
+  std::vector<std::vector<collision_parameters>> collisions_param_mlo;
+  collisions_param_mlo.resize(nb_real_particles_);
+  for (int ind_particle_i = 0; ind_particle_i < nb_real_particles_; ind_particle_i++) collisions_param_mlo[ind_particle_i].resize(nb_real_particles_);
+  begin_MLO = std::chrono::steady_clock::now();
+  MLO.find_closest(mesh.sommets(),compo_connecs_sommets, collisions_param_mlo );
+  end_MLO = std::chrono::steady_clock::now();
+
+  /*******************************DEBUG******************************* */
+  {
+    std::cout << mesh.sommets().dimension(0) << std::endl;
+    std::string path;
+    std::ofstream f;
+    path = "true_P_0.txt";
+    f.open(path);
+    for (int i = 0; i < compo_sommets[0].size(); ++i)
+      {
+        int i_global = compo_sommets[0][i];
+        f << i_global << "\n";
+      }
+    f.close();
+    path = "true_P_1.txt";
+    f.open(path);
+    for (int i = 0; i < compo_sommets[1].size(); ++i)
+      {
+        int i_global = compo_sommets[1][i];
+        f << i_global << "\n";
+      }
+    f.close();
+
+    f.open("sommets.txt");
+    for (int i = 0; i < mesh.sommets().dimension(0); ++i)
+      {
+        f << i << " ";
+        for (int d = 0; d < 3; ++d)
+          {
+            f << mesh.sommets()(i, d) << " ";
+          }
+        f << "\n";
+      }
+    f.close();
+    MLO.print_indices(compo_connecs_sommets);
+    // exit(0);
+  }
+
+  /*******************************END DEBUG******************************* */
 
   for (int ind_particle_i = 0; ind_particle_i < nb_real_particles_; ind_particle_i++)
     {
@@ -808,9 +868,16 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
       std::vector<collision_parameters> collisions_param;
       collisions_param.resize(nb_particles_j);
+
       if(octree_option!=Octree_Option::NONE)
         {
+          begin_octree = std::chrono::steady_clock::now();
           detect_collision(particle_i, collisions_param, nb_particles_j, ind_start_part_j, octree, compo_sommets, compo_connexes_fa7, compo_connecs_sommets, mesh);
+          end_octree = std::chrono::steady_clock::now();
+
+
+
+          time_octree+= std::chrono::duration_cast<std::chrono::nanoseconds>(end_octree - begin_octree).count();
         }
 
       Matrice_Dense Ji(dimension, dimension);
@@ -841,6 +908,19 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           int is_particle_particle_collision = collisions_param[ind_particle_j].part_part_collision;
           collisions_param[ind_particle_j].particle_i = particle_i;
           collisions_param[ind_particle_j].particle_j = particle_j;
+          std::ofstream f_verif;
+          f_verif.open("verif", std::ios::app);
+          if(particle_i==0 && ind_particle_j==1)
+            {
+              if(collisions_param[1].i_closest!=collisions_param_mlo[0][1].i_closest ||collisions_param[1].j_closest!= collisions_param_mlo[0][1].j_closest)
+                {
+                  if(collisions_param[1].i_closest!=-1 && collisions_param[1].j_closest!=-1)
+                    {
+                      f_verif<<t<<" "<<collisions_param[1].i_closest<<" "<<collisions_param[1].j_closest<<" "<<collisions_param_mlo[0][1].i_closest<<" "<<collisions_param_mlo[0][1].j_closest<<std::endl;
+                      exit(0);
+                    }
+                }
+            }
 
 
           if(!( (is_particle_particle_collision && compo_sommets[particle_j].size()==0) || compo_sommets[particle_i].size()==0))  //particle_j has no vertex in the local proc, so we continue
@@ -848,9 +928,9 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
               if(octree_option == Octree_Option::NONE)
                 {
-                  begin = std::chrono::steady_clock::now();
+                  // begin = std::chrono::steady_clock::now();
                   compute_dX(collisions_param[ind_particle_j].dX, collisions_param[ind_particle_j], particles_position, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
-                  end = std::chrono::steady_clock::now();
+                  // end = std::chrono::steady_clock::now();
                 }
 
               if(is_particle_particle_collision)
@@ -874,6 +954,12 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                   if(collisions_param[ind_particle_j].i_j_are_close)
                     {
                       dist_between_particles = -local_prodscal(collisions_param[ind_particle_j].dX,norm); //normal penetration distance
+                      // std::ofstream f_verif;
+                      // f_verif.open("verif", std::ios::app);
+                      // if(particle_i==0 && ind_particle_j==1)
+                      //   {
+                      //     f_verif<<t<<" "<<dist_between_particles<<" "<<-local_prodscal(collisions_param_mlo[0][ind_particle_j].dX,norm)<<std::endl;
+                      //   }
                     }
                 }
               else
@@ -894,10 +980,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           fu.open(path, std::ios::app);
           path = fichier_debug + "distance_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
           fd.open(path, std::ios::app);
-          path = fichier_debug + "time_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
-          ft.open(path, std::ios::app);
-          if(is_particle_particle_collision)
-            ft<<t<<" "<<std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()<<std::endl;
+
           // Check if the current proc is the one that has to compute the force
           DoubleTab dist(1); //can use mp_min_for_each_item only with TRUSTArray
           dist(0) = dist_between_particles;
@@ -1052,6 +1135,12 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
 
     }
+  std::string path;
+  path = fichier_debug + "time_P"+std::to_string(Process::me())+".txt";
+  std::ofstream ft;
+  ft.open(path, std::ios::app);
+  ft<<t<<" "<<time_octree<<" "<<time_mlo<<std::endl;
+  // if(is_particle_particle_collision)
   // if (detection_method_==Detection_method::LC_VERLET)
   //   {
   mp_sum_for_each_item(lagrangian_contact_forces_);

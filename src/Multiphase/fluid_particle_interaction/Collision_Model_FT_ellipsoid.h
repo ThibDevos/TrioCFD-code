@@ -17,24 +17,13 @@
 
 #include <Collision_Model_FT_base.h>
 #include <Connex_components_FT.h>
+#include <Morton_Linear_Octree_Particles.h>
 #include <Matrice_Dense.h>
 #include <Octree_Double.h>
+#include <collision_parameters.h>
 #include <fstream>
 
-struct collision_parameters
-{
-  int particle_i =-1;
-  int particle_j =-1;
-  int i_closest =-1;
-  int j_closest =-1;
-  bool i_facet = false;
-  bool j_facet = false;
-  bool i_j_are_close = false;
-  bool part_part_collision = false;
-  DoubleTab dX;
-  collision_parameters(int dimension) {dX.resize(dimension);}
-  collision_parameters() {dX.resize(3);}
-};
+
 
 /*! @brief : class Collision_Model_FT
  *
