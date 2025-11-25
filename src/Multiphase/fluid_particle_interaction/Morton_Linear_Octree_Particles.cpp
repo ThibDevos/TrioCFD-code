@@ -20,7 +20,6 @@ Morton_Linear_Octree_Particles::Morton_Linear_Octree_Particles(const DoubleTab& 
 
   build_leaves(compo_connexes_sommets);
   compute_neighbours();
-
 }
 
 //Transform floating points coordinates to integer coordinates
@@ -36,6 +35,8 @@ void Morton_Linear_Octree_Particles::float_coordinates_to_int(DoubleTab const& s
   max[0] = std::numeric_limits<double>::lowest();
   max[1]=max[0];
   max[2] = max[0];
+
+
   for(int i=0; i<sommets.dimension(0); ++i)
     {
       for(int d=0; d<dimension; ++d)
@@ -45,16 +46,24 @@ void Morton_Linear_Octree_Particles::float_coordinates_to_int(DoubleTab const& s
         }
     }
 
+  //Max length
+  double extent[3];
+  extent[0] = max[0] - min[0];
+  extent[1] = max[1] - min[1];
+  extent[2] = max[2] - min[2];
+
+  double Max = std::max(extent[0], std::max(extent[1], extent[2]));
+  if(Max == 0.0) Max = 1.0;
+
   for(int i=0; i<sommets.dimension(0); ++i)
     {
       for(int d=0; d<dimension; ++d)
         {
-          int_coords[i][d] = static_cast<uint32_t>(std::clamp((sommets(i,d) - min[d]) / (max[d] - min[d]),0.,1.) * max_coord);
+          int_coords[i][d] = static_cast<uint32_t>(std::clamp( (sommets(i,d) - min[d]) / (Max), 0.,1.) * max_coord);
         }
     }
 
   // use max and min to determine l
-  double Max = std::max( (max[0]-min[0]), std::max( (max[1]-min[1]), (max[2]-min[2]) ));
   l = (int)std::floor(std::log(Max/h) / std::log(2));
   if(l<0)l=0;
   std::cout<<"l = "<<l<<std::endl;
@@ -112,6 +121,7 @@ void Morton_Linear_Octree_Particles::build_leaves(const ArrOfInt& compo_connexes
           leaf_code = next_vertex_code;
         }
     }
+
   // we add the last leaf
   current_leaf.closest_vertex_indices.resize(current_leaf.vertex_indices.size());
   leaves.push_back(current_leaf);
@@ -186,7 +196,6 @@ void Morton_Linear_Octree_Particles::find_closest(const DoubleTab& sommets, cons
         {
           current_leaf.closest_vertex_indices[i] = -1;
           int index_i = current_leaf.vertex_indices[i];
-          if(index_i==1429)std::cout<<"got 1429\n";
           int compo_i = compo_connexes_sommets(index_i);
           ci[0] = sommets(index_i, 0);
           ci[1] = sommets(index_i, 1);
@@ -199,7 +208,6 @@ void Morton_Linear_Octree_Particles::find_closest(const DoubleTab& sommets, cons
                     continue;
 
                   int index_j = current_leaf.vertex_indices[j];
-                  if(index_j==2315)std::cout<<"got 2315\n";
                   cj[0] = sommets(index_j, 0);
                   cj[1] = sommets(index_j, 1);
                   cj[2] = sommets(index_j, 2);
@@ -208,7 +216,7 @@ void Morton_Linear_Octree_Particles::find_closest(const DoubleTab& sommets, cons
                     {
                       dX_loc(d) = ci(d) - cj(d);
                     }
-                  double d = sqrt(local_carre_norme_vect(dX_loc));
+                  double d = (local_carre_norme_vect(dX_loc));
                   int compo_j = compo_connexes_sommets(index_j);
                   if(compo_j==compo_i) continue;
                   bool swaped = false;
@@ -242,12 +250,11 @@ void Morton_Linear_Octree_Particles::find_closest(const DoubleTab& sommets, cons
             }
           for (auto neighbour_leaf : current_leaf.neighbours)
             {
-              // if (neighbour_leaf->compo == current_leaf.compo)
-              //   continue;
+              if (neighbour_leaf->compo == current_leaf.compo && current_leaf.compo !=1)
+                continue;
               for (int j = 0; j < (int)neighbour_leaf->vertex_indices.size(); ++j)
                 {
                   int index_j = neighbour_leaf->vertex_indices[j];
-                  if(index_j==2315)std::cout<<"got 2315\n";
                   cj[0] = sommets(index_j, 0);
                   cj[1] = sommets(index_j, 1);
                   cj[2] = sommets(index_j, 2);
@@ -255,7 +262,7 @@ void Morton_Linear_Octree_Particles::find_closest(const DoubleTab& sommets, cons
                     {
                       dX_loc(d) = ci(d) - cj(d);
                     }
-                  double d = sqrt(local_carre_norme_vect(dX_loc));
+                  double d = (local_carre_norme_vect(dX_loc));
                   int compo_j = compo_connexes_sommets(index_j);
                   if(compo_j==compo_i) continue;
                   bool swaped = false;
@@ -265,7 +272,6 @@ void Morton_Linear_Octree_Particles::find_closest(const DoubleTab& sommets, cons
                       std::swap(index_i, index_j);
                       swaped = true;
                     }
-                  if(index_i==1429 && index_j==2315) {std::cout<<"got them "<<d<<"    "<<param[compo_i][compo_j].distance<<"\n";}
                   assert(compo_i<compo_j);
                   if (d < (param[compo_i][compo_j].distance ))
                     {
