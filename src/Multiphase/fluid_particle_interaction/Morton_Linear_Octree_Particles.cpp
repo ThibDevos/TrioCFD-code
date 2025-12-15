@@ -1,11 +1,57 @@
 #include <Morton_Linear_Octree_Particles.h>
+#include <bitset>
 
+// Trie 'codes' et permute 'indices' en même temps pour rester synchronisé
+void radix_sort_indices(std::vector<uint64_t>& codes, std::vector<int>& indices)
+{
+  size_t n = codes.size();
+  if (n == 0) return;
+
+  // Buffers temporaires
+  std::vector<uint64_t> temp_codes(n);
+  std::vector<int> temp_indices(n);
+
+  // On traite 8 bits par passage (base 256) -> 8 passages pour 64 bits
+  // C'est souvent le sweet spot pour le cache L1
+  for (int shift = 0; shift < 64; shift += 8)
+    {
+      size_t count[257] = {0}; // Histogramme
+
+      // 1. Comptage
+      for (size_t i = 0; i < n; i++)
+        {
+          size_t bucket = (codes[i] >> shift) & 0xFF;
+          count[bucket + 1]++;
+        }
+
+      // 2. Sommes préfixées (calcul des positions de départ)
+      for (size_t i = 0; i < 256; i++)
+        {
+          count[i + 1] += count[i];
+        }
+
+      // 3. Placement dans les vecteurs temporaires
+      for (size_t i = 0; i < n; i++)
+        {
+          size_t bucket = (codes[i] >> shift) & 0xFF;
+          size_t pos = count[bucket]++;
+          temp_codes[pos] = codes[i];
+          temp_indices[pos] = indices[i];
+        }
+
+      // 4. Échange (Swap) pour le prochain tour
+      // On évite la copie coûteuse, on échange juste les pointeurs internes des vecteurs
+      codes.swap(temp_codes);
+      indices.swap(temp_indices);
+    }
+}
 
 Morton_Linear_Octree_Particles::Morton_Linear_Octree_Particles(const DoubleTab& sommets, double h,  const ArrOfInt& compo_connexes_sommets)
 {
   int nb_sommets=sommets.dimension(0);
   indices.resize(nb_sommets);
   Morton_code.resize(nb_sommets);
+  if(nb_sommets==0) return;
   std::iota(indices.begin(), indices.end(), 0);
   std::vector<std::array<uint32_t,3>> int_coords(nb_sommets);
 
@@ -14,9 +60,11 @@ Morton_Linear_Octree_Particles::Morton_Linear_Octree_Particles(const DoubleTab& 
   int_coordinates_to_Morton(int_coords);
 
   //Sort Morton_code (and indices to keep trace of the original indices)
-  std::sort(indices.begin(), indices.end(),
-  [&](int a, int b) { return Morton_code[a] < Morton_code[b]; });
-  std::sort(Morton_code.begin(), Morton_code.end());
+  // std::sort(indices.begin(), indices.end(),
+  // [&](int a, int b) { return Morton_code[a] < Morton_code[b]; });
+  // std::sort(Morton_code.begin(), Morton_code.end());
+
+  radix_sort_indices(Morton_code, indices);
 
   build_leaves(compo_connexes_sommets);
   compute_neighbours();
@@ -62,9 +110,14 @@ void Morton_Linear_Octree_Particles::float_coordinates_to_int(DoubleTab const& s
           int_coords[i][d] = static_cast<uint32_t>(std::clamp( (sommets(i,d) - min[d]) / (Max), 0.,1.) * max_coord);
         }
     }
-
+  uint32_t max_global_index = (1u << l) - 1;
+  // On projette l'extension physique sur la grille d'indices
+  // Note: extent/Max est <= 1.0.
+  grid_limits[0] = static_cast<uint32_t>( (extent[0]/Max) * max_global_index );
+  grid_limits[1] = static_cast<uint32_t>( (extent[1]/Max) * max_global_index );
+  grid_limits[2] = static_cast<uint32_t>( (extent[2]/Max) * max_global_index );
   // use max and min to determine l
-  l = (int)std::floor(std::log(Max/h) / std::log(2));
+  l = (int)std::floor(std::log(Max/(1.5e-4)) / std::log(2));
   if(l<0)l=0;
   std::cout<<"l = "<<l<<std::endl;
 }
@@ -92,7 +145,10 @@ The l first bits are taken using   >> (3*(L-l))
 */
 void Morton_Linear_Octree_Particles::build_leaves(const ArrOfInt& compo_connexes_sommets)
 {
-  std::cout<<"build_leaves"<<std::endl;
+  std::cout<<Process::me()<<" build_leaves"<<std::endl;
+  grid_limits[0] = 0;
+  grid_limits[1] = 0;
+  grid_limits[2] = 0;
   uint64_t leaf_code = Morton_code[0] >> (3*(L-l)); //Morton code of the first leaf
   leaf current_leaf;
   current_leaf.Morton_code = leaf_code;
@@ -109,10 +165,15 @@ void Morton_Linear_Octree_Particles::build_leaves(const ArrOfInt& compo_connexes
         }
       else //Morton_code[i] is not in current_leaf. We create a new leaf from it
         {
+          uint32_t x, y, z;
+          DecodeMorton(current_leaf.Morton_code, x, y, z);
+          if(x>grid_limits[0]) grid_limits[0] = x;
+          if(y>grid_limits[1]) grid_limits[1] = y;
+          if(z>grid_limits[2]) grid_limits[2] = z;
           current_leaf.closest_vertex_indices.resize(current_leaf.vertex_indices.size());
           leaves.push_back(current_leaf);
 
-          current_leaf = leaf(); //reset current leaf //XXX might not be the best way to do it
+          current_leaf = leaf(); //reset current leaf
 
           current_compo = compo_connexes_sommets(indices[i]);
           current_leaf.Morton_code = next_vertex_code;
@@ -123,22 +184,41 @@ void Morton_Linear_Octree_Particles::build_leaves(const ArrOfInt& compo_connexes
     }
 
   // we add the last leaf
+  uint32_t x, y, z;
+  DecodeMorton(current_leaf.Morton_code, x, y, z);
+  if(x>grid_limits[0]) grid_limits[0] = x;
+  if(y>grid_limits[1]) grid_limits[1] = y;
+  if(z>grid_limits[2]) grid_limits[2] = z;
   current_leaf.closest_vertex_indices.resize(current_leaf.vertex_indices.size());
   leaves.push_back(current_leaf);
+  std::cout<<Process::me()<<" leaves built"<<std::endl;
 }
 
 
 void Morton_Linear_Octree_Particles::compute_neighbours()
 {
-  std::cout<<"compute_neighbours"<<std::endl;
-
-  // int32_t max_coord = (1 << (L-l)) - 1; //for bound checking
-  std::map<uint64_t, size_t> morton_to_idx;
-  for(size_t i=0; i<leaves.size(); ++i) {morton_to_idx[leaves[i].Morton_code] = i;}
+  std::cout<<Process::me()<<" compute neighbours"<<std::endl;
   uint32_t x, y, z;
+  int nb_n = 0;
   for(auto &current_leaf : leaves)
     {
       DecodeMorton(current_leaf.Morton_code, x, y, z); //need to go back to interger coordinates
+      //set if the leaf is near a boundary or not
+      int boundary = 0;
+      boundary |=  (x==0);
+      boundary <<= 1;
+      boundary |=  (y==0);
+      boundary <<= 1;
+      boundary |=  (z==0);
+      boundary <<= 1;
+      boundary |=  (x==grid_limits[0]);
+      boundary <<= 1;
+      boundary |=  (y==grid_limits[1]);
+      boundary <<= 1;
+      boundary |=  (z==grid_limits[2]);
+
+      current_leaf.boundary = boundary;
+
       //each neighbours has the same coordinates with +/- 1 on the different coordinates
       for (int dx = -1; dx <= 1; ++dx)
         {
@@ -147,25 +227,30 @@ void Morton_Linear_Octree_Particles::compute_neighbours()
               for (int dz = -1; dz <= 1; ++dz)
                 {
                   if (dx == 0 && dy == 0 && dz == 0) continue; // this corresponds to itself
-                  // if ( x + dx < 0 ||  y + dy < 0 ||  z + dz < 0 ||  x + dx > max_coord ||  y + dy > max_coord || z + dz > max_coord) continue; //bounds
+                  if ( (int)(x + dx) < 0 ||  (int)(y + dy) < 0 ||  (int)(z + dz) < 0 ||  x + dx > grid_limits[0] ||  y + dy > grid_limits[1] || z + dz > grid_limits[2]) continue; //bounds
                   uint32_t nx = x + dx;
                   uint32_t ny = y + dy;
                   uint32_t nz = z + dz;
                   uint64_t n_code = encodeMorton(nx, ny, nz); //recode Morton
-                  auto it = morton_to_idx.find(n_code); //search for the Morton code of the neighbour in the list
-                  if (it != morton_to_idx.end()) // n_code might not exist if there is no vertex in this zone
+                  if(n_code<=current_leaf.Morton_code) continue;
+                  leaf search_leaf;
+                  search_leaf.Morton_code = n_code;
+                  auto it = std::lower_bound(leaves.begin(), leaves.end(), search_leaf, [](const leaf& a, const leaf&b) {return a.Morton_code<b.Morton_code;}); //we use the fact that the leaves are ordered
+                  if (it != leaves.end() && it->Morton_code==n_code ) // n_code might not exist if there is no vertex in this zone
                     {
-                      current_leaf.neighbours.push_back(&leaves[it->second]);
+                      current_leaf.neighbours.push_back(&leaves[it - leaves.begin()]);
                     }
                 }
             }
         }
+      nb_n += (int)current_leaf.neighbours.size();
     }
-  std::cout<<"finished neighbour"<<std::endl;
+  std::cout<<Process::me()<<" neighbour computed"<<std::endl;
 }
 
 void Morton_Linear_Octree_Particles::print_indices(const ArrOfInt& compo_connexes_sommets)
 {
+  std::cout<<"print indices"<<std::endl;
   std::ofstream f;
   for(auto & current_leaf : leaves )
     {
@@ -182,121 +267,404 @@ void Morton_Linear_Octree_Particles::print_indices(const ArrOfInt& compo_connexe
           f.close();
         }
     }
+  std::cout<<"indices printed"<<std::endl;
 
 }
 
-void Morton_Linear_Octree_Particles::find_closest(const DoubleTab& sommets, const ArrOfInt& compo_connexes_sommets, std::vector<std::vector<collision_parameters>>& param)
+void Morton_Linear_Octree_Particles::which_leaf(int s)
 {
-  DoubleTab dX_loc(dimension);
-  DoubleTab ci(dimension);
-  DoubleTab cj(dimension);
+  bool got_it = false;
+  uint64_t leaf_code;
   for (auto &current_leaf : leaves)
     {
       for (int i = 0; i < (int)current_leaf.vertex_indices.size(); ++i)
         {
-          current_leaf.closest_vertex_indices[i] = -1;
-          int index_i = current_leaf.vertex_indices[i];
-          int compo_i = compo_connexes_sommets(index_i);
-          ci[0] = sommets(index_i, 0);
-          ci[1] = sommets(index_i, 1);
-          ci[2] = sommets(index_i, 2);
-          if (current_leaf.compo == -1) // we have to look inside the leaf
+          if(current_leaf.vertex_indices[i] == s)
             {
-              for (int j = 0; j < (int)current_leaf.vertex_indices.size(); ++j) // loop on the other points of the leaf
+              got_it =true;
+              leaf_code = current_leaf.Morton_code;
+              std::cout<<"neighbours : ";
+              for(auto & n : current_leaf.neighbours)
                 {
-                  if (i == j)
-                    continue;
+                  std::cout<<n->Morton_code<<" ";
+                }
+              std::cout<<std::endl;
+            }
+        }
+    }
+  if(got_it) {std::cout<<"Leaf for "<<s<<" : "<<leaf_code<<std::endl;}
+  else {std::cout<<"not found"<<std::endl;}
+}
 
-                  int index_j = current_leaf.vertex_indices[j];
-                  cj[0] = sommets(index_j, 0);
-                  cj[1] = sommets(index_j, 1);
-                  cj[2] = sommets(index_j, 2);
+void Morton_Linear_Octree_Particles::find_closest(const DoubleTab& sommets, const ArrOfInt& compo_connexes_sommets, std::vector<std::vector<collision_parameters>>& param,
+                                                  DoubleVect const& origin, DoubleVect const& domain_dimensions)
+{
+  std::ofstream f;
+  f.open("last_check.txt");
+  DoubleTab dX_loc(dimension);
+  f<<"test writing"<<std::endl;
+  for(auto & current_leaf : leaves)
+    {
+      f<<"Check leaf "<<current_leaf.Morton_code<<" with "<<current_leaf.vertex_indices.size()<<" vertices in and "<<current_leaf.neighbours.size()<<" neighbours"<<std::endl;
+      std::vector<int> vertices;
+      std::vector<double> coordinates;
+      //we first load all vertices indices and brut force on the list
+      //If current_leaf.compo != -1, then we don't need to load vertices in current_leaf, and only need to load vertices of the neighbour leaves that have neighbour->compo != current_leaf.compo
 
-                  for (int d = 0; d < dimension; ++d)
+      for(int i=0; i<(int)current_leaf.vertex_indices.size(); ++i)
+        {
+          vertices.push_back(current_leaf.vertex_indices[i]);
+          for(int d=0; d<dimension; ++d) {coordinates.push_back(sommets(current_leaf.vertex_indices[i],d));}
+        }
+      for(auto neighbour_leaf : current_leaf.neighbours)
+        {
+          //if(neighbour_leaf->compo == current_leaf.compo && current_leaf.compo !=-1) continue;
+          for(int i=0; i<(int)neighbour_leaf->vertex_indices.size(); ++i)
+            {
+              vertices.push_back(neighbour_leaf->vertex_indices[i]);
+              for(int d=0; d<dimension; ++d) {coordinates.push_back(sommets(neighbour_leaf->vertex_indices[i],d));}
+            }
+        }
+
+      f<<vertices.size()<<std::endl;
+      for(int i=0; i<(int)current_leaf.vertex_indices.size(); ++i)
+        {
+          int index_i = vertices[i];
+          int compo_i = compo_connexes_sommets(index_i);
+          int boundary_mask = current_leaf.boundary;
+          int nb_particles_tot = (int)param[0].size();
+          //check boundaries
+          // /!\ As for the rest of the Collision Models at this time, it is for rectangle domain with faces parallel to the canonical basis
+          if(boundary_mask!=0)
+            {
+              int ind_wall = 0;
+              if(boundary_mask & 32)
+                {
+                  double d = std::fabs(coordinates[3*i + 0] - origin[0]);
+                  ind_wall = nb_particles_tot - 6;
+                  if(d<param[compo_i][ind_wall].distance)
                     {
-                      dX_loc(d) = ci(d) - cj(d);
+                      param[compo_i][ind_wall].i_closest = index_i;
+                      param[compo_i][ind_wall].i_j_are_close = true;
+                      param[compo_i][ind_wall].distance = d;
+                      param[compo_i][ind_wall].dX(0)= d;
                     }
-                  double d = (local_carre_norme_vect(dX_loc));
-                  int compo_j = compo_connexes_sommets(index_j);
-                  if(compo_j==compo_i) continue;
-                  bool swaped = false;
-                  if (compo_j < compo_i)
+                }
+              if(boundary_mask & 16)
+                {
+                  double d = std::fabs(coordinates[3*i + 1]- origin[1]);
+                  ind_wall = nb_particles_tot -5 ;
+                  if(d<param[compo_i][ind_wall].distance)
                     {
-                      std::swap(compo_j, compo_i);
-                      std::swap(index_i, index_j);
-                      swaped = true;
+                      param[compo_i][ind_wall].i_closest = index_i;
+                      param[compo_i][ind_wall].i_j_are_close = true;
+                      param[compo_i][ind_wall].distance = d;
+                      param[compo_i][ind_wall].dX(1)= d;
                     }
-                  assert(compo_i<compo_j);
-                  if (d < (param[compo_i][compo_j].distance ))
+                }
+              if(boundary_mask & 8)
+                {
+                  double d = std::fabs(coordinates[3*i + 2] - origin[2]);
+                  ind_wall = nb_particles_tot - 4;
+                  if(d<param[compo_i][ind_wall].distance)
                     {
-                      std::cout<<"new couple for MLO  "<<index_i<<" "<<index_j<<" in compos "<<compo_i<<" and "<<compo_j<<std::endl;
-                      current_leaf.closest_vertex_indices[i] = index_j;
-                      param[compo_i][compo_j].i_closest = index_i;
-                      param[compo_i][compo_j].j_closest = index_j;
-                      param[compo_i][compo_j].i_j_are_close = true;
-                      param[compo_i][compo_j].part_part_collision = true;
-                      param[compo_i][compo_j].distance = d;
-                      for (int k = 0; k < dimension; ++k)
-                        {
-                          param[compo_i][compo_j].dX(k) = dX_loc(k);
-                        }
+                      param[compo_i][ind_wall].i_closest = index_i;
+                      param[compo_i][ind_wall].i_j_are_close = true;
+                      param[compo_i][ind_wall].distance = d;
+                      param[compo_i][ind_wall].dX(2)= d;
                     }
-                  if(swaped)
+                }
+              if(boundary_mask & 4)
+                {
+                  // std::cout<<"dom dim : "<<-origin[0] - domain_dimensions[0]<<std::endl;
+                  double d = std::fabs(coordinates[3*i + 0] - origin[0] - domain_dimensions[0]);
+                  // std::cout<<d<<std::endl;
+                  ind_wall = nb_particles_tot - 3;
+                  if(d<param[compo_i][ind_wall].distance)
                     {
-                      std::swap(compo_j, compo_i);
-                      std::swap(index_i, index_j);
+                      param[compo_i][ind_wall].i_closest = index_i;
+                      param[compo_i][ind_wall].i_j_are_close = true;
+                      param[compo_i][ind_wall].distance = d;
+                      param[compo_i][ind_wall].dX(0)= d;
+                    }
+                }
+              if(boundary_mask & 2)
+                {
+                  double d = std::fabs(coordinates[3*i + 1] - origin[1] - domain_dimensions[1]);
+                  ind_wall = nb_particles_tot - 2;
+                  if(d<param[compo_i][ind_wall].distance)
+                    {
+                      param[compo_i][ind_wall].i_closest = index_i;
+                      param[compo_i][ind_wall].i_j_are_close = true;
+                      param[compo_i][ind_wall].distance = d;
+                      param[compo_i][ind_wall].dX(1)= d;
+                    }
+                }
+              if(boundary_mask & 1)
+                {
+                  double d = std::fabs(coordinates[3*i + 2] - origin[2] - domain_dimensions[2]);
+                  ind_wall = nb_particles_tot - 1;
+                  if(d<param[compo_i][ind_wall].distance)
+                    {
+                      param[compo_i][ind_wall].i_closest = index_i;
+                      param[compo_i][ind_wall].i_j_are_close = true;
+                      param[compo_i][ind_wall].distance = d;
+                      param[compo_i][ind_wall].dX(2)= d;
                     }
                 }
             }
-          for (auto neighbour_leaf : current_leaf.neighbours)
+
+
+          int j = current_leaf.compo == -1 ? i+1 : (int)current_leaf.vertex_indices.size() +1;
+          for(j=i+1; j<(int)vertices.size(); ++j)
             {
-              if (neighbour_leaf->compo == current_leaf.compo && current_leaf.compo !=1)
-                continue;
-              for (int j = 0; j < (int)neighbour_leaf->vertex_indices.size(); ++j)
+
+              int index_j = vertices[j];
+              int compo_j = compo_connexes_sommets(index_j);
+              if(compo_i==compo_j) continue;
+
+
+              for (int d = 0; d < dimension; ++d)
                 {
-                  int index_j = neighbour_leaf->vertex_indices[j];
-                  cj[0] = sommets(index_j, 0);
-                  cj[1] = sommets(index_j, 1);
-                  cj[2] = sommets(index_j, 2);
-                  for (int d = 0; d < dimension; ++d)
+                  dX_loc(d) = coordinates[3*i + d] - coordinates[3*j + d];
+                }
+              double d = (local_carre_norme_vect(dX_loc));
+              bool swaped = false;
+              if (compo_j < compo_i)
+                {
+                  std::swap(compo_j, compo_i);
+                  std::swap(index_i, index_j);
+                  swaped = true;
+                }
+              assert(compo_i<compo_j);
+              f<<"["<<Process::me()<<"] check index "<<index_i<<" with "<<index_j<<std::endl;
+              if (d < (param[compo_i][compo_j].distance ))
+                {
+                  std::cout<<"[MORTON "<<Process::me()<<"] : new couple "<<index_i<<" "<<index_j<<" for particles "<<compo_i<<" and "<<compo_j<<"    "<<sqrt(d)<<std::endl;
+                  current_leaf.closest_vertex_indices[i] = index_j;
+                  param[compo_i][compo_j].i_closest = index_i;
+                  param[compo_i][compo_j].j_closest = index_j;
+                  param[compo_i][compo_j].i_j_are_close = true;
+                  param[compo_i][compo_j].part_part_collision = true;
+                  param[compo_i][compo_j].distance = d;
+                  for (int k = 0; k < dimension; ++k)
                     {
-                      dX_loc(d) = ci(d) - cj(d);
+                      param[compo_i][compo_j].dX(k) = dX_loc(k) * (swaped ? -1 : 1);
                     }
-                  double d = (local_carre_norme_vect(dX_loc));
-                  int compo_j = compo_connexes_sommets(index_j);
-                  if(compo_j==compo_i) continue;
-                  bool swaped = false;
-                  if (compo_j < compo_i)
-                    {
-                      std::swap(compo_j, compo_i);
-                      std::swap(index_i, index_j);
-                      swaped = true;
-                    }
-                  assert(compo_i<compo_j);
-                  if (d < (param[compo_i][compo_j].distance ))
-                    {
-                      std::cout<<"new couple for MLO in neighbour  "<<index_i<<" "<<index_j<<" in compos "<<compo_i<<" and "<<compo_j<<std::endl;
-                      current_leaf.closest_vertex_indices[i] = index_j;
-                      param[compo_i][compo_j].i_closest = index_i;
-                      param[compo_i][compo_j].j_closest = index_j;
-                      param[compo_i][compo_j].i_j_are_close = true;
-                      param[compo_i][compo_j].part_part_collision = true;
-                      param[compo_i][compo_j].distance = d;
-                      for (int k = 0; k < dimension; ++k)
-                        {
-                          param[compo_i][compo_j].dX(k) = dX_loc(k);
-                        }
-                    }
-                  if(swaped)
-                    {
-                      std::swap(compo_j, compo_i);
-                      std::swap(index_i, index_j);
-                    }
+                }
+              if(swaped)
+                {
+                  std::swap(compo_j, compo_i);
+                  std::swap(index_i, index_j);
                 }
             }
         }
     }
+  f.close();
+  std::cout<<"end closest"<<std::endl;
 }
+
+// void Morton_Linear_Octree_Particles::find_closest(const DoubleTab& sommets, const ArrOfInt& compo_connexes_sommets, std::vector<std::vector<collision_parameters>>& param,
+//                                                   DoubleVect const& origin, DoubleVect const& domain_dimensions)
+// {
+
+//   std::cout<<"find closest"<<std::endl;
+//   DoubleTab dX_loc(dimension);
+//   DoubleTab ci(dimension);
+//   DoubleTab cj(dimension);
+//   int nb_particles_tot = (int)param[0].size();
+//   std::cout<<nb_particles_tot<<std::endl;
+//   for (auto &current_leaf : leaves)
+//     {
+//       for (int i = 0; i < (int)current_leaf.vertex_indices.size(); ++i)
+//         {
+//           current_leaf.closest_vertex_indices[i] = -1;
+//           int index_i = current_leaf.vertex_indices[i];
+//           int compo_i = compo_connexes_sommets(index_i);
+//           ci[0] = sommets(index_i, 0);
+//           ci[1] = sommets(index_i, 1);
+//           ci[2] = sommets(index_i, 2);
+
+//           int boundary_mask = current_leaf.boundary;
+//           //check boundaries
+//           // /!\ As for the rest of the Collision Models at this time, it is for rectangle domain with faces parallel to the canonical basis
+//           if(boundary_mask!=0)
+//             {
+//               std::cout<<"             "<<index_i<<std::endl;
+//               int ind_wall = 0;
+//               if(boundary_mask & 32)
+//                 {
+//                   double d = std::fabs(ci[0] - origin[0]);
+//                   ind_wall = nb_particles_tot - 6;
+//                   if(d<param[compo_i][ind_wall].distance)
+//                     {
+//                       std::cout<<"for x-, ind_wall="<<ind_wall<<std::endl;
+//                       param[compo_i][ind_wall].i_closest = index_i;
+//                       param[compo_i][ind_wall].i_j_are_close = true;
+//                       param[compo_i][ind_wall].distance = d;
+//                       param[compo_i][ind_wall].dX(0)= d;
+//                     }
+//                 }
+//               if(boundary_mask & 16)
+//                 {
+//                   double d = std::fabs(ci[1] - origin[1]);
+//                   ind_wall = nb_particles_tot -5 ;
+//                   if(d<param[compo_i][ind_wall].distance)
+//                     {
+//                       std::cout<<"for y-, ind_wall="<<ind_wall<<std::endl;
+//                       param[compo_i][ind_wall].i_closest = index_i;
+//                       param[compo_i][ind_wall].i_j_are_close = true;
+//                       param[compo_i][ind_wall].distance = d;
+//                       param[compo_i][ind_wall].dX(1)= d;
+//                     }
+//                 }
+//               if(boundary_mask & 8)
+//                 {
+//                   double d = std::fabs(ci[2] - origin[2]);
+//                   ind_wall = nb_particles_tot - 4;
+//                   if(d<param[compo_i][ind_wall].distance)
+//                     {
+//                       std::cout<<"for z-, ind_wall="<<ind_wall<<std::endl;
+//                       param[compo_i][ind_wall].i_closest = index_i;
+//                       param[compo_i][ind_wall].i_j_are_close = true;
+//                       param[compo_i][ind_wall].distance = d;
+//                       param[compo_i][ind_wall].dX(2)= d;
+//                     }
+//                 }
+//               if(boundary_mask & 4)
+//                 {
+//                   double d = std::fabs(ci[0] - origin[0] - domain_dimensions[0]);
+//                   ind_wall = nb_particles_tot - 3;
+//                   if(d<param[compo_i][ind_wall].distance)
+//                     {
+//                       std::cout<<"for x+, ind_wall="<<ind_wall<<std::endl;
+//                       param[compo_i][ind_wall].i_closest = index_i;
+//                       param[compo_i][ind_wall].i_j_are_close = true;
+//                       param[compo_i][ind_wall].distance = d;
+//                       param[compo_i][ind_wall].dX(0)= d;
+//                     }
+//                 }
+//               if(boundary_mask & 2)
+//                 {
+//                   double d = std::fabs(ci[1] - origin[1] - domain_dimensions[1]);
+//                   ind_wall = nb_particles_tot - 2;
+//                   if(d<param[compo_i][ind_wall].distance)
+//                     {
+//                       std::cout<<"for y+, ind_wall="<<ind_wall<<std::endl;
+//                       param[compo_i][ind_wall].i_closest = index_i;
+//                       param[compo_i][ind_wall].i_j_are_close = true;
+//                       param[compo_i][ind_wall].distance = d;
+//                       param[compo_i][ind_wall].dX(1)= d;
+//                     }
+//                 }
+//               if(boundary_mask & 1)
+//                 {
+//                   double d = std::fabs(ci[2] - origin[2] - domain_dimensions[2]);
+//                   ind_wall = nb_particles_tot - 1;
+//                   if(d<param[compo_i][ind_wall].distance)
+//                     {
+//                       std::cout<<"for z+, ind_wall="<<ind_wall<<std::endl;
+//                       param[compo_i][ind_wall].i_closest = index_i;
+//                       param[compo_i][ind_wall].i_j_are_close = true;
+//                       param[compo_i][ind_wall].distance = d;
+//                       param[compo_i][ind_wall].dX(2)= d;
+//                     }
+//                 }
+//             }
+
+//           if (current_leaf.compo == -1) // we have to look inside the leaf
+//             {
+//               for (int j = i+1; j < (int)current_leaf.vertex_indices.size(); ++j) // loop on the other points of the leaf
+//                 {
+//                   int index_j = current_leaf.vertex_indices[j];
+//                   int compo_j = compo_connexes_sommets(index_j);
+//                   if(compo_j==compo_i) continue;
+//                   cj[0] = sommets(index_j, 0);
+//                   cj[1] = sommets(index_j, 1);
+//                   cj[2] = sommets(index_j, 2);
+
+//                   for (int d = 0; d < dimension; ++d)
+//                     {
+//                       dX_loc(d) = ci(d) - cj(d);
+//                     }
+//                   double d = (local_carre_norme_vect(dX_loc));
+//                   bool swaped = false;
+//                   if (compo_j < compo_i)
+//                     {
+//                       std::swap(compo_j, compo_i);
+//                       std::swap(index_i, index_j);
+//                       swaped = true;
+//                     }
+//                   assert(compo_i<compo_j);
+//                   if (d < (param[compo_i][compo_j].distance ))
+//                     {
+//                       current_leaf.closest_vertex_indices[i] = index_j;
+//                       param[compo_i][compo_j].i_closest = index_i;
+//                       param[compo_i][compo_j].j_closest = index_j;
+//                       param[compo_i][compo_j].i_j_are_close = true;
+//                       param[compo_i][compo_j].part_part_collision = true;
+//                       param[compo_i][compo_j].distance = d;
+//                       for (int k = 0; k < dimension; ++k)
+//                         {
+//                           param[compo_i][compo_j].dX(k) = dX_loc(k);
+//                         }
+//                     }
+//                   if(swaped)
+//                     {
+//                       std::swap(compo_j, compo_i);
+//                       std::swap(index_i, index_j);
+//                     }
+//                 }
+//             }
+//           for (auto neighbour_leaf : current_leaf.neighbours)
+//             {
+//               if (neighbour_leaf->compo == current_leaf.compo && current_leaf.compo !=-1)
+//                 continue;
+//               for (int j = 0; j < (int)neighbour_leaf->vertex_indices.size(); ++j)
+//                 {
+//                   int index_j = neighbour_leaf->vertex_indices[j];
+//                   int compo_j = compo_connexes_sommets(index_j);
+//                   if(compo_j==compo_i) continue;
+//                   cj[0] = sommets(index_j, 0);
+//                   cj[1] = sommets(index_j, 1);
+//                   cj[2] = sommets(index_j, 2);
+//                   for (int d = 0; d < dimension; ++d)
+//                     {
+//                       dX_loc(d) = ci(d) - cj(d);
+//                     }
+//                   double d = (local_carre_norme_vect(dX_loc));
+//                   bool swaped = false;
+//                   if (compo_j < compo_i)
+//                     {
+//                       std::swap(compo_j, compo_i);
+//                       std::swap(index_i, index_j);
+//                       swaped = true;
+//                     }
+//                   assert(compo_i<compo_j);
+//                   if (d < (param[compo_i][compo_j].distance ))
+//                     {
+//                       current_leaf.closest_vertex_indices[i] = index_j;
+//                       param[compo_i][compo_j].i_closest = index_i;
+//                       param[compo_i][compo_j].j_closest = index_j;
+//                       param[compo_i][compo_j].i_j_are_close = true;
+//                       param[compo_i][compo_j].part_part_collision = true;
+//                       param[compo_i][compo_j].distance = d;
+//                       for (int k = 0; k < dimension; ++k)
+//                         {
+//                           param[compo_i][compo_j].dX(k) = dX_loc(k);
+//                         }
+//                     }
+//                   if(swaped)
+//                     {
+//                       std::swap(compo_j, compo_i);
+//                       std::swap(index_i, index_j);
+//                     }
+//                 }
+//             }
+//         }
+//     }
+//   std::cout<<"found closest"<<std::endl;
+// }
 
 //x is written using 21 bits (all 9 bits forming the 32bits int are 0).
 //This function returns the same number but with two 0 between each bit
