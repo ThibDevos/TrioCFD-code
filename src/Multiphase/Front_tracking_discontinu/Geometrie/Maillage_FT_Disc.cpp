@@ -6570,18 +6570,18 @@ void Maillage_FT_Disc::compute_gravity_center_fa7()
  */
 void Maillage_FT_Disc::compute_mesh_size() const
 {
-  local_mesh_size = std::numeric_limits<double>::min();
+  local_mesh_size = 0.0;
   double h=0.;
   for(int f = 0; f<nb_facettes(); ++f)
     {
       for(int v=0; v<3; ++v)
         {
-          h = pow(sommets_(facettes_(f,v%3), 0) - sommets_(facettes_(f,(v+1)%3), 0),2) +
-              pow(sommets_(facettes_(f,v%3), 1) - sommets_(facettes_(f,(v+1)%3), 1),2) +
-              pow(sommets_(facettes_(f,v%3), 2) - sommets_(facettes_(f,(v+1)%3), 2),2);
-          local_mesh_size = h > local_mesh_size ? h : local_mesh_size;
+          h = pow(sommets_(facettes_(f,v), 0) - sommets_(facettes_(f,(v+1)%3), 0),2) +
+              pow(sommets_(facettes_(f,v), 1) - sommets_(facettes_(f,(v+1)%3), 1),2) +
+              pow(sommets_(facettes_(f,v), 2) - sommets_(facettes_(f,(v+1)%3), 2),2);
+          local_mesh_size = std::max(local_mesh_size, h);
         }
     }
-  local_mesh_size = sqrt(local_mesh_size);
+  local_mesh_size = std::sqrt(local_mesh_size);
   global_mesh_size = Process::mp_max(local_mesh_size);
 }
