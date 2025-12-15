@@ -17,7 +17,7 @@
 
 #include <Collision_Model_FT_base.h>
 #include <Connex_components_FT.h>
-#include <Morton_Linear_Octree_Particles.h>
+#include <Z_Curve_Link_Cell.h>
 #include <Matrice_Dense.h>
 #include <Octree_Double.h>
 #include <collision_parameters.h>
@@ -59,9 +59,9 @@ public:
                       DoubleTab const& positions, bool check_cg, DoubleTab& dX);
 
   void closest_nodes(IntLists const& compo_sommets, Maillage_FT_Disc const& mesh, collision_parameters& param,
-                     DoubleTab& dX, bool chek_cg);
+                     DoubleTab& dX);
   void closest_nodes(IntLists const& compo_sommets,const ArrOfInt& compo_connexes_fa7, const IntLists& compo_connexe_facets, Maillage_FT_Disc const& mesh, collision_parameters& param,
-                     DoubleTab& dX, bool chek_cg, const Octree_Double& octree);
+                     DoubleTab& dX, const Octree_Double& octree);
 
   void normal_i(Maillage_FT_Disc const& mesh, IntLists const& sommets_facets, collision_parameters& param, DoubleTab& n);
   void normal_average_ij(Maillage_FT_Disc const& mesh,IntLists const& sommets_facets, collision_parameters& param, DoubleTab& n);
@@ -113,8 +113,8 @@ private:
   Collision_detection collision_detection_ = Collision_detection::DEEPEST;
   enum class Collision_normal {NORMAL_I, NORMAL_IJ};
   Collision_normal collision_normal_ = Collision_normal::NORMAL_IJ;
-  enum class Octree_Option {NONE, SOMMETS, FACETTES};
-  Octree_Option octree_option = Octree_Option::SOMMETS;
+  enum class Detection_Option {NAIVE, OCTREE, ZLC};
+  Detection_Option detection_option = Detection_Option::ZLC;
   // XXX debug
   Motcle fichier_debug;
 };

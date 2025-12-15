@@ -1,5 +1,5 @@
-#ifndef MORTON_LINEAR_OCTREE_PARTICLES
-#define MORTON_LINEAR_OCTREE_PARTICLES
+#ifndef Z_CURVE_LINK_CELL
+#define Z_CURVE_LINK_CELL
 #include <vector>
 #include <iostream>
 #include <algorithm>
@@ -8,10 +8,12 @@
 #include <TRUSTTabFT.h>
 #include <fstream>
 
-class Morton_Linear_Octree_Particles
+class Z_Curve_Link_Cell
 {
 public:
-  Morton_Linear_Octree_Particles(const DoubleTab& sommets, double h,   const ArrOfInt& compo_connexes_sommets);
+  Z_Curve_Link_Cell();
+  Z_Curve_Link_Cell(const DoubleTab& sommets, double h,   const ArrOfInt& compo_connexes_sommets);
+  void build(const DoubleTab& sommets, double h,   const ArrOfInt& compo_connexes_sommets); //same as the constructor
   void float_coordinates_to_int(DoubleTab const& sommets, std::vector<std::array<uint32_t,3>>& int_coords, double h);
   void int_coordinates_to_Morton(std::vector<std::array<uint32_t,3>>& int_coords);
   void build_leaves(const ArrOfInt& compo_connexes_sommets);
