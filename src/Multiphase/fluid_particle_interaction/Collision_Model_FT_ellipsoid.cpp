@@ -907,60 +907,12 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           double max_dist = 0.;
           if (dist_between_particles <= 0) // contact
             {
-              std::cout<<"Coliision detected "<<is_particle_particle_collision<<" "<<dist_between_particles<<std::endl;
 
-              /*---------------------DEBUG---------------------------*/
 
-              std::ofstream f_verif;
-              f_verif.open("verif", std::ios::app);
-              /* for two parts
-              if(particle_i==0 && ind_particle_j==1)
-                {
-                  if(collisions_param[1].i_closest!=collisions_param_mlo[0][1].i_closest ||collisions_param[1].j_closest!= collisions_param_mlo[0][1].j_closest)
-                    {
-                      if(collisions_param[1].i_closest!=-1 && collisions_param[1].j_closest!=-1)
-                        {
-                          f_verif<<t<<"\n";
-                          f_verif<<"naive/morton : "<<" "<<collisions_param[1].i_closest<<" "<<collisions_param[1].j_closest<<" "<<collisions_param_mlo[0][1].i_closest<<" "<<collisions_param_mlo[0][1].j_closest<<std::endl;
-                          f_verif<<"Distance naive/morton : "<<sqrt(local_carre_norme_vect(collisions_param[ind_particle_j].dX))<<" "<<sqrt(collisions_param_mlo[0][1].distance)<<std::endl;
-                          if(collisions_param[1].i_closest!=collisions_param_mlo[0][1].i_closest ||collisions_param[1].j_closest!= collisions_param_mlo[0][1].j_closest)
-                            {f_verif<<"------------------------------"<<std::endl; exit(0);}
-                        }
-                    }
-                  if(collisions_param[1].i_closest!=collisions_param_octree[1].i_closest ||collisions_param[1].j_closest!= collisions_param_octree[1].j_closest)
-                    {
-                      if(collisions_param_octree[1].i_closest!=-1 && collisions_param_octree[1].j_closest!=-1)
-                        {
-                          f_verif<<t<<"\n";
-                          f_verif<<"naive/octree : "<<" "<<collisions_param[1].i_closest<<" "<<collisions_param[1].j_closest<<" "<<collisions_param_octree[1].i_closest<<" "<<collisions_param_octree[1].j_closest<<std::endl;
-                          f_verif<<"Distance naive/octree : "<<sqrt(local_carre_norme_vect(collisions_param[ind_particle_j].dX))<<" "<<sqrt(collisions_param_octree[1].distance)<<std::endl;
-                          if(collisions_param[1].i_closest!=collisions_param_octree[1].i_closest ||collisions_param[1].j_closest!= collisions_param_octree[1].j_closest)
-                            f_verif<<"------------------------------"<<std::endl;
-                        }
-                    }
-                }*/
-              // if(collisions_param_octree[ind_particle_j].i_closest != collisions_param_mlo[ind_particle_i][ind_particle_j].i_closest)
-              //   {
-              //     std::cout<<"Not corresponding"<<std::endl;
-              //     f_verif<<"Octree / Morton---------------------------";
-              //     f_verif<<t<<"\n";
-              //     f_verif<<"particle i : "<<ind_particle_i<<"      particle j : "<<ind_particle_j<<std::endl;
-              //     f_verif<<" is particle particle collision ? : " <<is_particle_particle_collision<<std::endl;
-              //     f_verif<<"octree : "<<collisions_param_octree[ind_particle_j].i_closest<<" "<<collisions_param_octree[ind_particle_j].j_closest<<std::endl;
-              //     f_verif<<"Morton : "<<collisions_param_mlo[ind_particle_i][ind_particle_j].i_closest<<" "<<collisions_param_mlo[ind_particle_i][ind_particle_j].j_closest<<std::endl;
-              //     // f_verif<<collisions_param_mlo[ind_particle_i][2].i_closest<<" "<<collisions_param_mlo[ind_particle_i][3].i_closest<<" "<<collisions_param_mlo[ind_particle_i][4].i_closest<<" ";
-              //     // f_verif<<collisions_param_mlo[ind_particle_i][5].i_closest<<" "<<collisions_param_mlo[ind_particle_i][6].i_closest<<" "<<collisions_param_mlo[ind_particle_i][7].i_closest<<std::endl;
-              //     f_verif<<local_prodscal(collisions_param_octree[ind_particle_j].dX,norm)<<" "<<local_prodscal(collisions_param_mlo[ind_particle_i][ind_particle_j].dX,norm)<<std::endl;                  // exit(0);
-              //     // if(collisions_param[ind_particle_j].i_closest != collisions_param_mlo[ind_particle_i][ind_particle_j].i_closest)
-              //     //   {
-              //     exit(0);
-              //   }
-              /*---------------------FIN DEBUG---------------------------*/
 
 
               std::cout<<dX(0)<<" " <<dX(1)<<" "<<dX(2)<<std::endl;
               compute_dU_cp(dU, collision_point, collisions_param[ind_particle_j], is_particle_particle_collision, compo_sommets, part_prop, mesh);
-              // compute_dU_cp(dU, collision_point, collisions_param_mlo[ind_particle_i][ind_particle_j], is_particle_particle_collision, compo_sommets, part_prop, mesh);
               std::cout<<"Computed du cp"<<std::endl;
               std::ofstream fcol;
               path = fichier_debug + "is_collision_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
@@ -970,7 +922,6 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               if(is_particle_particle_collision) {dist_between_particles*=-1;}
               add_collision(particle_i,particle_j,is_particle_particle_collision);
 
-              // double dX_scal_dU = local_prodscal(dX,dU) / (dist_gravity_center>0 ? dist_gravity_center : 1);
               double dU_scal_norm = local_prodscal(dU,norm);
               DoubleTab dUn(dimension);
               for (int d = 0; d < dimension; d++)
@@ -983,9 +934,6 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                                           F_old_(particle_i, particle_j); // We need to know
               // if this is the first time step of the collision to compute the impact velocity
 
-              // DoubleTab next_dX(dimension);
-              // for (int d = 0; d < dimension; d++)
-              //   next_dX(d) = dX(d) + deltat_simu * dU(d);
               const double effective_radius = is_particle_particle_collision ? solid_particle.get_equivalent_radius()/2 :
                                               solid_particle.get_equivalent_radius();
               const double impact_Stokes = solid_density * 2 * effective_radius * impact_velocity /
@@ -1123,9 +1071,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
       ft<<t<<" "<<tot_const_octrcee<<" "<<tot_closest_octree<<" "<<tot_const_octrcee+tot_closest_octree<<std::endl;
       ft.close();
     }
-  // if(is_particle_particle_collision)
-  // if (detection_method_==Detection_method::LC_VERLET)
-  //   {
+
   mp_sum_for_each_item(lagrangian_contact_forces_);
   mp_sum_for_each_item(lagrangian_contact_moments_);
   mp_max_for_each_item(F_old_);
@@ -1134,9 +1080,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   mp_sum_for_each_item(particles_collision_number_);
   collision_number_=Process::check_int_overflow(Process::mp_sum(collision_number_));
 
-  // output_orientation(particles_position,compo_sommets, mesh,particles_position.dimension(0), t);
-  // }
-  // t+=deltat_simu;
+
 }
 
 //XXX Inertia not a ref to debug only
