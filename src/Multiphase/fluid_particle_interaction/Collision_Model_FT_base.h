@@ -190,6 +190,7 @@ protected:
   DoubleTab e_eff_t; // effective tangential restitution coefficient
   DoubleTab F_old_;
   DoubleTab F_now_;
+  IntTab closest_indices;
   DoubleTab lagrangian_contact_forces_;
   DoubleTab lagrangian_contact_moments_;
   DoubleVect collision_detected_;

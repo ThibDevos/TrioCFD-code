@@ -156,6 +156,8 @@ void Collision_Model_FT_base::reset()
   const int nb_boundaries=2*dimension;
   F_old_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
   F_now_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
+  closest_indices.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
+  closest_indices = -1;
   e_eff_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
   e_eff_t.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
   Cerr << "WARNING: Collision_Model_FT_base::reset of F_old_, F_now_, "
@@ -709,6 +711,8 @@ DoubleTab Collision_Model_FT_base::compute_contact_force(
       const double e_eff_particle = is_compression_step ? 1 : e_eff_(particle_i, particle_j);
       const double stiffness = is_collision_part_part ? stiffness_breugem_part_part_:
                                stiffness_breugem_wall_part_;
+      // if(e_eff_particle==0) {std::cout<<"tttttttttttttttttttttttttttttttttttttttttttttttttttt e eff est nul"<<std::endl; exit(0);}
+      // if(stiffness==0) {std::cout<<"tttttttttttttttttttttttttttttttttttttttttttttttttttt stiffness est nul"<<std::endl; exit(0);}
       for (int d = 0; d < dimension; d++)
         force_contact(d)= -pow(e_eff_particle,2) * stiffness * next_dist_int * norm(d);
     }

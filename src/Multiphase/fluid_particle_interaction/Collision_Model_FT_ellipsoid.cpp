@@ -842,6 +842,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
               if(detection_option==Detection_Option::NAIVE)
                 {
+                  std::cout<<"use naive"<<std::endl;
                   begin_naive = std::chrono::steady_clock::now();
                   compute_dX(collisions_param[ind_particle_j].dX, collisions_param[ind_particle_j], particles_position, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
                   end_naive = std::chrono::steady_clock::now();
@@ -850,7 +851,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
               if(is_particle_particle_collision)
                 {
-
+                  std::cout<<"is part part col"<<std::endl;
                   if(collisions_param[ind_particle_j].i_j_are_close)
                     {
                       compute_norm(norm, collisions_param[ind_particle_j], sommets_facets, mesh);
@@ -869,8 +870,60 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                 {
                   if(collisions_param[ind_particle_j].i_j_are_close)
                     {
+                      if(closest_indices(ind_particle_i,ind_particle_j)==-1 || closest_indices(ind_particle_j,ind_particle_i)==-1)
+                        {
+                          int i = collisions_param[ind_particle_j].i_closest;
+                          int j = collisions_param[ind_particle_j].j_closest;
+                          for(int d=0; d<dimension; ++d)
+                            {
+                              dX(d) = mesh.sommets()(i,d) - mesh.sommets()(j,d);
+                            }
+                          dist_between_particles = -local_prodscal(dX,norm);
+                          if(dist_between_particles<=0) //we have a collision so we store the indices
+                            {
+                              closest_indices(ind_particle_j,ind_particle_i)=collisions_param[ind_particle_j].i_closest;
+                              closest_indices(ind_particle_i,ind_particle_j)=collisions_param[ind_particle_j].j_closest;
+                            }
+                        }
+                      else //we already have a pair from previous time step
+                        {
+                          int i = closest_indices(ind_particle_j,ind_particle_i);
+                          int j = closest_indices(ind_particle_i,ind_particle_j);
+                          for(int d=0; d<dimension; ++d)
+                            {
+                              dX(d) = mesh.sommets()(i,d) - mesh.sommets()(j,d);
+                            }
+                          dist_between_particles = -local_prodscal(dX,norm);
+                          if(dist_between_particles>0) //we are not on a collision so we uptdate
+                            {
+                              closest_indices(ind_particle_i,ind_particle_j)=collisions_param[ind_particle_j].j_closest;
+                              closest_indices(ind_particle_j,ind_particle_i)=collisions_param[ind_particle_j].i_closest;
+                              i = closest_indices(ind_particle_j,ind_particle_i);
+                              j = closest_indices(ind_particle_i,ind_particle_j);
+                              for(int d=0; d<dimension; ++d)
+                                {
+                                  dX(d) = mesh.sommets()(i,d) - mesh.sommets()(j,d);
+                                }
+                            }
+                          else //we are still in the collision
+                            {
+                              collisions_param[ind_particle_j].j_closest = closest_indices(ind_particle_i,ind_particle_j);
+                              collisions_param[ind_particle_j].i_closest = closest_indices(ind_particle_j,ind_particle_i);
+                            }
+                        }
 
-                      dist_between_particles = -local_prodscal(collisions_param[ind_particle_j].dX,norm); //normal penetration distance
+
+                      dist_between_particles = -local_prodscal(dX,norm); //normal penetration distance
+                      if(dist_between_particles>0) //no collision
+                        {
+                          closest_indices(ind_particle_i,ind_particle_j)=-1;
+                          closest_indices(ind_particle_j,ind_particle_i)=-1;
+                        }
+                    }
+                  else
+                    {
+                      closest_indices(ind_particle_i,ind_particle_j)=-1;
+                      closest_indices(ind_particle_j,ind_particle_i)=-1;
                     }
                 }
               else
@@ -907,16 +960,12 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           double max_dist = 0.;
           if (dist_between_particles <= 0) // contact
             {
-
-
-
-
-              std::cout<<dX(0)<<" " <<dX(1)<<" "<<dX(2)<<std::endl;
               compute_dU_cp(dU, collision_point, collisions_param[ind_particle_j], is_particle_particle_collision, compo_sommets, part_prop, mesh);
               std::cout<<"Computed du cp"<<std::endl;
               std::ofstream fcol;
               path = fichier_debug + "is_collision_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
               fcol.open(path, std::ios::app);
+              fcol<<collisions_param[ind_particle_j].i_closest<<" "<<collisions_param[ind_particle_j].j_closest<<std::endl;
               max_dist = std::max(max_dist, -dist_between_particles);
 
               if(is_particle_particle_collision) {dist_between_particles*=-1;}
@@ -939,18 +988,22 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               const double impact_Stokes = solid_density * 2 * effective_radius * impact_velocity /
                                            (9 * fluid_viscosity);
               if (is_start_of_collision)
-                e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes);
+                {std::cout<<"Compute e_eff"<<std::endl; e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes);}
+              std::cout<<"e_eff = " <<e_eff_(particle_i,particle_j)<<" e_dry = "<<e_dry<<endl;
+              std::cout<<solid_density<<" "<<effective_radius<<" "<<impact_velocity<<" "<<fluid_viscosity<<std::endl;
+              std::cout<<impact_Stokes<<" "<<compute_ewet_legendre(impact_Stokes)<<std::endl;;
               DoubleTab force_contact=compute_contact_force(
                                         dist_between_particles,
                                         norm,
                                         dUn,
                                         particle_i,
                                         particle_j,
-                                        dU_scal_norm<=0,
+                                        dU_scal_norm>=0,
                                         is_particle_particle_collision);
 
               ffn<<"Proc "<<Process::me()<<" "<<t<<" "<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
               fu<<"Proc "<<Process::me()<<" "<<t<<" "<<dUn(0)<<" "<<dUn(1)<<" "<<dUn(2)<<" "<<impact_velocity<<"\n";
+              fd<<"Proc "<<Process::me()<<" "<<t<<" "<<dist_between_particles<<" "<<norm(0)<<" "<<norm(1)<<" "<<norm(2)<<"\n";
               for(int d=0; d<dimension; ++d)
                 {
                   dUt(d) = dU(d) - dUn(d);
@@ -1027,8 +1080,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
               F_old_(particle_i, particle_j) = F_now_(particle_i, particle_j);
             }
-          if(particle_j - nb_particles_tot_==1) //ground
-            fd<<"Proc "<<Process::me()<<" "<<t<<" "<<max_dist<<"\n";
+
 
         }
       //XXX debug file, energy
