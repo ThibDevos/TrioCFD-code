@@ -982,9 +982,13 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               int is_start_of_collision = F_now_(particle_i, particle_j) >
                                           F_old_(particle_i, particle_j); // We need to know
               // if this is the first time step of the collision to compute the impact velocity
+              double a = solid_particle.get_x_radius();
+              double b = solid_particle.get_y_radius();
+              double c = solid_particle.get_z_radius();
+              double effective_radius = a*b*c * (pow(collision_point(0)/(a*a),2) + pow(collision_point(1)/(b*b),2) + pow(collision_point(2)/(c*c),2));
 
-              const double effective_radius = is_particle_particle_collision ? solid_particle.get_equivalent_radius()/2 :
-                                              solid_particle.get_equivalent_radius();
+              // const double effective_radius = is_particle_particle_collision ? solid_particle.get_equivalent_radius()/2 :
+              //                                 solid_particle.get_equivalent_radius();
               const double impact_Stokes = solid_density * 2 * effective_radius * impact_velocity /
                                            (9 * fluid_viscosity);
               if (is_start_of_collision)
@@ -1146,8 +1150,7 @@ DoubleTab Collision_Model_FT_ellipsoid::compute_contact_moment(Matrice_Dense Ine
   Inertia.inverse(); //Inertia is now its inverse
   for(int d = 0; d<dimension; ++d)
     {
-      temp[d] = (r[(d+1)%3] * force[(d+2)%3] - r[(d+2)%3] * force[(d+1)%3]) -
-                (Omega[(d+1)%3] * InertiaOmega[(d+2)%3] - Omega[(d+2)%3] * InertiaOmega[(d+1)%3]);
+      temp[d] = (r[(d+1)%3] * force[(d+2)%3] - r[(d+2)%3] * force[(d+1)%3]);
     }
   Inertia.ajouter_multvect_(temp,contact_moment);
   return contact_moment;
@@ -1216,14 +1219,19 @@ void Collision_Model_FT_ellipsoid::discretize_contact_forces_eulerian_field(
             }
           Ji.inverse();//Ji is now its inverse
           Ji.ajouter_multvect_(OmegaJOmgea,inertia);
+          //Omega_r = \omega \times r
+          //inertia = J^{-1} \omega \times J \omega
 
 
           contact_force_source_term(face)=(1-volumic_phase_indicator_function(face))
-                                          *interlaced_volumes(face)*(lagrangian_contact_forces_(id_number,ori)
-                                                                     + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
-                                                                        lagrangian_contact_moments_(id_number,(ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) )) +
-                                                                     /*collision **/ part_prop.density * ( Omega_i((ori+1)%3) * Omega_r((ori+2)%3) - Omega_i((ori+2)%3) * Omega_r((ori+1)%3) +
-                                                                                                           inertia(ori)));
+                                          *interlaced_volumes(face)*(
+                                            lagrangian_contact_forces_(id_number,ori)
+                                            + (lagrangian_contact_moments_(id_number,(ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
+                                               lagrangian_contact_moments_(id_number,(ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) ))
+                                            -  (inertia((ori+1)%3) * (cg_faces(face,(ori+2)%3) - particles_position(id_number,(ori+2)%3)) -
+                                                inertia((ori+2)%3) * (cg_faces(face,(ori+1)%3) - particles_position(id_number,(ori+1)%3) )) +
+                                            /*collision **/ part_prop.density * ( Omega_i((ori+1)%3) * Omega_r((ori+2)%3) - Omega_i((ori+2)%3) * Omega_r((ori+1)%3))
+                                          );
         }
     }
   std::ofstream f,g;
