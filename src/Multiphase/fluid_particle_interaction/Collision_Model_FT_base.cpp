@@ -142,6 +142,14 @@ int Collision_Model_FT_base::lire_motcle_non_standard(const Motcle& word, Entree
         }
       return 1;
     }
+  else if (word=="detection_option")
+    {
+      Motcles words;
+      words.add("naive");
+      words.add("octree");
+      words.add("zlc");
+      return 1;
+    }
   else
     {
       Cerr << word << " is not a keyword understood by " << que_suis_je() <<
