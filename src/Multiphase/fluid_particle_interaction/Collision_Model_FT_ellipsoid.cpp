@@ -1002,7 +1002,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                                         dUn,
                                         particle_i,
                                         particle_j,
-                                        dU_scal_norm>=0,
+                                        dU_scal_norm<=0,
                                         is_particle_particle_collision);
 
               ffn<<"Proc "<<Process::me()<<" "<<t<<" "<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
