@@ -200,10 +200,16 @@ void Z_Curve_Link_Cell::build_leaves(const ArrOfInt& compo_connexes_sommets)
 
 void Z_Curve_Link_Cell::compute_neighbours()
 {
+  std::ofstream f;
+  f.open("lower_bound_start.txt", std::ios::app);
+  std::chrono::steady_clock::time_point begin;
+  std::chrono::steady_clock::time_point end;
+  auto time =  std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
   uint32_t x, y, z;
   int nb_n = 0;
-  for(auto &current_leaf : leaves)
+  for (auto it = leaves.begin(); it != leaves.end(); ++it)
     {
+      auto& current_leaf = *it;
       DecodeMorton(current_leaf.Morton_code, x, y, z); //need to go back to interger coordinates
       //set if the leaf is near a boundary or not
       int boundary = 0;
@@ -237,16 +243,34 @@ void Z_Curve_Link_Cell::compute_neighbours()
                   if(n_code<=current_leaf.Morton_code) continue;
                   leaf search_leaf;
                   search_leaf.Morton_code = n_code;
-                  auto it = std::lower_bound(leaves.begin(), leaves.end(), search_leaf, [](const leaf& a, const leaf&b) {return a.Morton_code<b.Morton_code;}); //we use the fact that the leaves are ordered
-                  if (it != leaves.end() && it->Morton_code==n_code ) // n_code might not exist if there is no vertex in this zone
+                  begin = std::chrono::steady_clock::now();
+                  // auto found_it = leaves.end();
+                  auto found_it = std::lower_bound(it+1, leaves.end(), search_leaf, [](const leaf& a, const leaf&b) {return a.Morton_code<b.Morton_code;}); //we use the fact that the leaves are ordered
+                  // for(auto it_n = it+1; it_n!= leaves.end(); it_n++)
+                  //   {
+                  //     if(it_n->Morton_code==n_code)
+                  //       {
+                  //         found_it = it_n;
+                  //         break;
+                  //       }
+                  //     if(it_n->Morton_code > n_code)
+                  //       {
+                  //         break;
+                  //       }
+
+                  //   }
+                  end = std::chrono::steady_clock::now();
+                  time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+                  if(found_it!=leaves.end() && found_it->Morton_code == n_code)
                     {
-                      current_leaf.neighbours.push_back(&leaves[it - leaves.begin()]);
+                      current_leaf.neighbours.push_back(&leaves[found_it - leaves.begin()]);
                     }
                 }
             }
         }
       nb_n += (int)current_leaf.neighbours.size();
     }
+  f<<time<<" "<<time/leaves.size()<<"\n";
 }
 
 void Z_Curve_Link_Cell::print_indices(const ArrOfInt& compo_connexes_sommets)
