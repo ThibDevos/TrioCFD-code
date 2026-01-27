@@ -229,6 +229,8 @@ protected:
 
   enum class Detection_method { CHECK_ALL, VERLET, LC_VERLET};
   Detection_method detection_method_ = Detection_method::CHECK_ALL;
+
+  double link_cell_size=1.;
 };
 
 #endif

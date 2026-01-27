@@ -124,7 +124,8 @@ void Z_Curve_Link_Cell::float_coordinates_to_int(DoubleTab const& sommets, std::
   grid_limits[1] = static_cast<uint32_t>( (extent[1]/Max) * max_global_index );
   grid_limits[2] = static_cast<uint32_t>( (extent[2]/Max) * max_global_index );
   // use max and min to determine l
-  l = (int)std::floor(std::log(Max/(1.5e-4)) / std::log(2));
+  l = (int)std::floor(std::log(Max/(h)) / std::log(2));
+  std::cout<<"l= "<<l<<std::endl;
   if(l<0)l=0;
 }
 

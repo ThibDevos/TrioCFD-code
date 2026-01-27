@@ -763,7 +763,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   if(detection_option==Detection_Option::ZLC)
     {
       begin_MLO = std::chrono::steady_clock::now();
-      ZLC.build(mesh.sommets(), 1.5e-4, compo_connecs_sommets);
+      ZLC.build(mesh.sommets(), link_cell_size * solid_particle.get_max_radius(), compo_connecs_sommets);
       end_MLO = std::chrono::steady_clock::now();
       construction_mlo += std::chrono::duration_cast<std::chrono::nanoseconds>(end_MLO - begin_MLO).count();
       //Contact detection already done here
@@ -1008,6 +1008,14 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               ffn<<"Proc "<<Process::me()<<" "<<t<<" "<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
               fu<<"Proc "<<Process::me()<<" "<<t<<" "<<dUn(0)<<" "<<dUn(1)<<" "<<dUn(2)<<" "<<impact_velocity<<"\n";
               fd<<"Proc "<<Process::me()<<" "<<t<<" "<<dist_between_particles<<" "<<norm(0)<<" "<<norm(1)<<" "<<norm(2)<<"\n";
+              if(is_particle_particle_collision)
+                {
+
+                  std::ofstream fdd;
+                  path = fichier_debug + "distance.txt";
+                  fdd.open(path, std::ios::app);
+                  fdd<<dist_between_particles<<std::endl;
+                }
               for(int d=0; d<dimension; ++d)
                 {
                   dUt(d) = dU(d) - dUn(d);

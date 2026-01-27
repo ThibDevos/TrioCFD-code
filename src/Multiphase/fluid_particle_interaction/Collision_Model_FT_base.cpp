@@ -50,6 +50,7 @@ void Collision_Model_FT_base::set_param(Param& p)
   p.ajouter_non_std("collision_detection", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision detection when using FT
   p.ajouter_non_std("collision_normal", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision normal when using FT
   p.ajouter_non_std("fichier_debug", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision normal when using FT
+  p.ajouter("link_cell_size", &link_cell_size, Param::OPTIONAL); // XD_ADD_P chaine name of the collision normal when using FT
   p.ajouter("collision_duration", &collision_duration_, Param::REQUIRED); // XD_ADD_P double duration of the collision in seconds;
   p.ajouter("activate_collision_before_impact", &is_collision_activated_before_impact_, Param::REQUIRED); // XD_ADD_P int activate collision before impact (1) or not (0)
   p.ajouter("activation_distance_percentage_diameter", &activation_distance_percentage_diameter_, Param::REQUIRED); // XD_ADD_P double activation distance of the collision process as a percentage of the particle diameter
