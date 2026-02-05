@@ -604,7 +604,7 @@ void Collision_Model_FT_ellipsoid::compute_dX_boundary(collision_parameters& par
 
 //used
 void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<collision_parameters>& col_param, int nb_part_j, int start_j, const Octree_Double& octree, IntLists const& compo_sommets,
-                                                    const ArrOfInt& compo_connexes_fa7, const ArrOfInt& compo_connexes_sommets, const Maillage_FT_Disc& mesh)
+                                                    const ArrOfInt& compo_connexes_fa7, const ArrOfInt& compo_connexes_sommets, const Maillage_FT_Disc& mesh, double h)
 {
   //initialization
   DoubleTab dX_min_norm(nb_part_j);
@@ -628,7 +628,7 @@ void Collision_Model_FT_ellipsoid::detect_collision(int part_i, std::vector<coll
   int num_sommet = -1;
   int num_compo_j = -1;
   double dist = 0.;
-  double distmax =1.5e-4;
+  double distmax =h;
   for (int i = 0; i < compo_sommets[part_i].size(); ++i) //loop on all the vertices of the compo i
     {
 
@@ -798,7 +798,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
       if(detection_option==Detection_Option::OCTREE)
         {
           begin_octree = std::chrono::steady_clock::now();
-          detect_collision(particle_i, collisions_param, nb_particles_j, ind_start_part_j, octree, compo_sommets, compo_connexes_fa7, compo_connecs_sommets, mesh);
+          detect_collision(particle_i, collisions_param, nb_particles_j, ind_start_part_j, octree, compo_sommets, compo_connexes_fa7, compo_connecs_sommets, mesh, link_cell_size * solid_particle.get_max_radius());
           end_octree = std::chrono::steady_clock::now();
           closest_octree+= std::chrono::duration_cast<std::chrono::nanoseconds>(end_octree - begin_octree).count();
         }
@@ -985,7 +985,10 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               double a = solid_particle.get_x_radius();
               double b = solid_particle.get_y_radius();
               double c = solid_particle.get_z_radius();
-              double effective_radius = a*b*c * (pow(collision_point(0)/(a*a),2) + pow(collision_point(1)/(b*b),2) + pow(collision_point(2)/(c*c),2));
+              double x = particles_position(ind_particle_i, 0) - collision_point(0);
+              double y = particles_position(ind_particle_i, 1) - collision_point(1);
+              double z = particles_position(ind_particle_i, 2) - collision_point(2);
+              double effective_radius = a*b*c * (pow(x/(a*a),2) + pow(y/(b*b),2) + pow(z/(c*c),2));
 
               // const double effective_radius = is_particle_particle_collision ? solid_particle.get_equivalent_radius()/2 :
               //                                 solid_particle.get_equivalent_radius();
