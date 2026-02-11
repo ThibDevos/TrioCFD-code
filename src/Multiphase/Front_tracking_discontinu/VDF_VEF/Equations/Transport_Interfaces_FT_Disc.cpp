@@ -9598,6 +9598,7 @@ void Transport_Interfaces_FT_Disc::calculer_vitesses_rotation(const Maillage_FT_
           for(int j=0; j<dimension; ++j)
             {
               AtA(i,j) = A(i,j);
+              A(i,j) = 0.; //clean A
             }
         }
       AtA.inverse(); //AtA is now the inverse of AtA previously computed
