@@ -721,7 +721,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   particles_collision_number_=0;
 
   /*--------------all these functions should be refactored as search_connex_components_local_FT and compute_global_connex_components_FT are called in each one*/
-  test_connex_compo(mesh);
+  //test_connex_compo(mesh);
   IntLists compo_sommets; //compo_sommet[i] contient les indices des sommets (dans le proc) composant la compo i
   connec_compo_sommets(mesh, compo_sommets);
   IntLists sommets_facets; //compo_sommet[i] contient les indices des sommets composant la compo i
@@ -741,8 +741,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
   Z_Curve_Link_Cell ZLC;
   std::vector<std::vector<collision_parameters>> collisions_param_zlc;
   collisions_param_zlc.resize(nb_real_particles_);
-  for (int ind_particle_i = 0; ind_particle_i < nb_real_particles_; ind_particle_i++) collisions_param_zlc[ind_particle_i].resize(nb_real_particles_ + 2*dimension);
-
+  for (int ind_particle_i = 0; ind_particle_i < nb_real_particles_; ind_particle_i++) collisions_param_zlc[ind_particle_i].resize(nb_real_particles_ + 2*dimension - ind_particle_i - 1);
 
   //XXX check time
   std::chrono::steady_clock::time_point begin_octree;
@@ -789,6 +788,8 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
   for (int ind_particle_i = 0; ind_particle_i < nb_real_particles_; ind_particle_i++)
     {
+
+      Cerr<<ind_particle_i<<"/"<<nb_real_particles_<<endl;
       int particle_i=get_particle_i(ind_particle_i);
       int nb_particles_j=get_nb_particles_j(ind_particle_i);
       int ind_start_part_j=get_ind_start_particles_j(ind_particle_i);
@@ -828,7 +829,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
           if(detection_option==Detection_Option::ZLC)
             {
-              collisions_param[ind_particle_j] = collisions_param_zlc[ind_particle_i][ind_particle_j];
+              collisions_param[ind_particle_j] = collisions_param_zlc[ind_particle_i][ind_particle_j-ind_particle_i-1];
             }
           collisions_param[ind_particle_j].part_part_collision = particle_j < nb_particles_tot_;
           collisions_param[ind_particle_j].particle_i = particle_i;
@@ -854,7 +855,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                   std::cout<<"is part part col"<<std::endl;
                   if(collisions_param[ind_particle_j].i_j_are_close)
                     {
-                      compute_norm(norm, collisions_param[ind_particle_j], sommets_facets, mesh);
+			    compute_norm(norm, collisions_param[ind_particle_j], sommets_facets, mesh);
                     }
                 }
               else
@@ -935,7 +936,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                     }
                 }
             }
-          std::ofstream ffn, fft, fm, fu, fd, ft;
+          /*std::ofstream ffn, fft, fm, fu, fd, ft;
           std::string path;
           path = fichier_debug + "normal_force_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
           ffn.open(path, std::ios::app);
@@ -946,13 +947,13 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           path = fichier_debug + "vitesse_impact_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
           fu.open(path, std::ios::app);
           path = fichier_debug + "distance_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
-          fd.open(path, std::ios::app);
+          fd.open(path, std::ios::app);*/
 
-          // Check if the current proc is the one that has to compute the force
-          DoubleTab dist(1); //can use mp_min_for_each_item only with TRUSTArray
-          dist(0) = dist_between_particles;
-          mp_min_for_each_item(dist);
-          if(dist(0)!=dist_between_particles) continue;
+	  // Check if the current proc is the one that has to compute the force
+          //DoubleTab dist(1); //can use mp_min_for_each_item only with TRUSTArray
+          //dist(0) = dist_between_particles;
+          //mp_min_for_each_item(dist);
+          //if(dist(0)!=dist_between_particles) continue;
 
 
 
@@ -961,11 +962,10 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
           if (dist_between_particles <= 0) // contact
             {
               compute_dU_cp(dU, collision_point, collisions_param[ind_particle_j], is_particle_particle_collision, compo_sommets, part_prop, mesh);
-              std::cout<<"Computed du cp"<<std::endl;
-              std::ofstream fcol;
+              /*std::ofstream fcol;
               path = fichier_debug + "is_collision_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
               fcol.open(path, std::ios::app);
-              fcol<<collisions_param[ind_particle_j].i_closest<<" "<<collisions_param[ind_particle_j].j_closest<<std::endl;
+              fcol<<collisions_param[ind_particle_j].i_closest<<" "<<collisions_param[ind_particle_j].j_closest<<std::endl;*/
               max_dist = std::max(max_dist, -dist_between_particles);
 
               if(is_particle_particle_collision) {dist_between_particles*=-1;}
@@ -995,10 +995,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               const double impact_Stokes = solid_density * 2 * effective_radius * impact_velocity /
                                            (9 * fluid_viscosity);
               if (is_start_of_collision)
-                {std::cout<<"Compute e_eff"<<std::endl; e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes);}
-              std::cout<<"e_eff = " <<e_eff_(particle_i,particle_j)<<" e_dry = "<<e_dry<<endl;
-              std::cout<<solid_density<<" "<<effective_radius<<" "<<impact_velocity<<" "<<fluid_viscosity<<std::endl;
-              std::cout<<impact_Stokes<<" "<<compute_ewet_legendre(impact_Stokes)<<std::endl;;
+                { e_eff_(particle_i,particle_j)=e_dry*compute_ewet_legendre(impact_Stokes);}
               DoubleTab force_contact=compute_contact_force(
                                         dist_between_particles,
                                         norm,
@@ -1008,24 +1005,24 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                                         dU_scal_norm<=0,
                                         is_particle_particle_collision);
 
-              ffn<<"Proc "<<Process::me()<<" "<<t<<" "<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
+              /*ffn<<"Proc "<<Process::me()<<" "<<t<<" "<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
               fu<<"Proc "<<Process::me()<<" "<<t<<" "<<dUn(0)<<" "<<dUn(1)<<" "<<dUn(2)<<" "<<impact_velocity<<"\n";
-              fd<<"Proc "<<Process::me()<<" "<<t<<" "<<dist_between_particles<<" "<<norm(0)<<" "<<norm(1)<<" "<<norm(2)<<"\n";
-              if(is_particle_particle_collision)
+              fd<<"Proc "<<Process::me()<<" "<<t<<" "<<dist_between_particles<<" "<<norm(0)<<" "<<norm(1)<<" "<<norm(2)<<"\n";*/
+              /*if(is_particle_particle_collision)
                 {
 
                   std::ofstream fdd;
                   path = fichier_debug + "distance.txt";
                   fdd.open(path, std::ios::app);
                   fdd<<dist_between_particles<<std::endl;
-                }
+                }*/
               for(int d=0; d<dimension; ++d)
                 {
                   dUt(d) = dU(d) - dUn(d);
                 }
               double dUt_norm = 0.;
               dUt_norm = sqrt(local_carre_norme_vect(dUt));
-              std::cout<<"dut_norm: "<<dUt_norm<<std::endl;
+              //std::cout<<"dut_norm: "<<dUt_norm<<std::endl;
               for(int d=0; d<dimension; ++d)
                 {
                   tang(d) = dUt(d)/dUt_norm;
@@ -1043,7 +1040,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                 {
                   force_contact(d) += tangential_force_contact(d);
                 }
-              fft<<"Proc "<<Process::me()<<" "<<t<<" "<<tangential_force_contact(0)<<" "<<tangential_force_contact(1)<<" "<<tangential_force_contact(2)<<"\n";
+              //fft<<"Proc "<<Process::me()<<" "<<t<<" "<<tangential_force_contact(0)<<" "<<tangential_force_contact(1)<<" "<<tangential_force_contact(2)<<"\n";
 
 
 
@@ -1074,11 +1071,11 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
                     }
                   moment_contact_j=compute_contact_moment(Jj,force_contact, rj, Omega_j);
                 }
-              fm<<"Proc "<<Process::me()<<" "<<t<<" "<<moment_contact_i(0)<<" "<<moment_contact_i(1)<<" "<<moment_contact_i(2)<<"\n";
+              //fm<<"Proc "<<Process::me()<<" "<<t<<" "<<moment_contact_i(0)<<" "<<moment_contact_i(1)<<" "<<moment_contact_i(2)<<"\n";
 
-              ffn.close();
-              fft.close();
-              fm.close();
+              //ffn.close();
+              //fft.close();
+              //fm.close();
               for (int d = 0; d < dimension; d++)
                 {
                   lagrangian_contact_forces_(particle_i, d) += fabs(force_contact(d)) <=
@@ -1099,7 +1096,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 
         }
       //XXX debug file, energy
-      DoubleTab v(dimension), om(dimension);
+      /*DoubleTab v(dimension), om(dimension);
       DoubleTab InertiaOmega(dimension);
       for(int d=0; d<dimension; ++d) {v(d) = particles_velocity(particle_i,d); om(d) = particles_rot_velocity(particle_i,d);}
       Ji.ajouter_multvect_(om,InertiaOmega);
@@ -1111,7 +1108,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
       std::fstream f;
       path = fichier_debug + "energy_" + std::to_string(Process::me())+".txt";
       f.open(path, std::ios::app);
-      f<<t<<" "<<energy<<" "<<energy_potentielle<<" "<<energy_cinetique<<" "<<energy_rotation<<"\n";
+      f<<t<<" "<<energy<<" "<<energy_potentielle<<" "<<energy_cinetique<<" "<<energy_rotation<<"\n";*/
 
 
     }

@@ -345,22 +345,22 @@ void Z_Curve_Link_Cell::find_closest(const DoubleTab& sommets, const ArrOfInt& c
               for(int d=0; d<dimension; ++d) {coordinates.push_back(sommets(neighbour_leaf->vertex_indices[i],d));}
             }
         }
-
       for(int i=0; i<(int)current_leaf.vertex_indices.size(); ++i)
         {
           int index_i = vertices[i];
           int compo_i = compo_connexes_sommets(index_i);
           int boundary_mask = current_leaf.boundary;
-          int nb_particles_tot = (int)param[0].size();
+          int nb_particles_tot = (int)param[compo_i].size();
           //check boundaries
           // /!\ As for the rest of the Collision Models at this time, it is for rectangle domain with faces parallel to the canonical basis
-          if(boundary_mask!=0)
+	  if(boundary_mask!=0)
             {
-              int ind_wall = 0;
+		    int ind_wall = 0;
               if(boundary_mask & 32)
                 {
                   double d = std::fabs(coordinates[3*i + 0] - origin[0]);
                   ind_wall = nb_particles_tot - 6;
+
                   if(d<param[compo_i][ind_wall].distance)
                     {
                       param[compo_i][ind_wall].i_closest = index_i;
@@ -433,7 +433,6 @@ void Z_Curve_Link_Cell::find_closest(const DoubleTab& sommets, const ArrOfInt& c
                 }
             }
 
-
           int j = current_leaf.compo == -1 ? i+1 : (int)current_leaf.vertex_indices.size() +1;
           for(j=i+1; j<(int)vertices.size(); ++j)
             {
@@ -456,17 +455,17 @@ void Z_Curve_Link_Cell::find_closest(const DoubleTab& sommets, const ArrOfInt& c
                   swaped = true;
                 }
               assert(compo_i<compo_j);
-              if (d < (param[compo_i][compo_j].distance ))
+              if (d < (param[compo_i][compo_j-compo_i-1].distance ))
                 {
                   current_leaf.closest_vertex_indices[i] = index_j;
-                  param[compo_i][compo_j].i_closest = index_i;
-                  param[compo_i][compo_j].j_closest = index_j;
-                  param[compo_i][compo_j].i_j_are_close = true;
-                  param[compo_i][compo_j].part_part_collision = true;
-                  param[compo_i][compo_j].distance = d;
+                  param[compo_i][compo_j-compo_i-1].i_closest = index_i;
+                  param[compo_i][compo_j-compo_i-1].j_closest = index_j;
+                  param[compo_i][compo_j-compo_i-1].i_j_are_close = true;
+                  param[compo_i][compo_j-compo_i-1].part_part_collision = true;
+                  param[compo_i][compo_j-compo_i-1].distance = d;
                   for (int k = 0; k < dimension; ++k)
                     {
-                      param[compo_i][compo_j].dX(k) = dX_loc(k) * (swaped ? -1 : 1);
+                      param[compo_i][compo_j-compo_i-1].dX(k) = dX_loc(k) * (swaped ? -1 : 1);
                     }
                 }
               if(swaped)
