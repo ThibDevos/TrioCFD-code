@@ -44,13 +44,11 @@ Sortie& Collision_Model_FT_base::printOn(Sortie& os) const
 
 void Collision_Model_FT_base::set_param(Param& p)
 {
-  p.ajouter_non_std("detection_option", (this),Param::REQUIRED); // XD_ADD_P chaine name of the collision model
   p.ajouter_non_std("collision_model", (this),Param::REQUIRED); // XD_ADD_P chaine name of the collision model
   p.ajouter_non_std("detection_method", (this),Param::REQUIRED); // XD_ADD_P chaine method to detect collisions
   p.ajouter_non_std("collision_detection", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision detection when using FT
   p.ajouter_non_std("collision_normal", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision normal when using FT
   p.ajouter_non_std("fichier_debug", (this),Param::OPTIONAL); // XD_ADD_P chaine name of the collision normal when using FT
-  p.ajouter("link_cell_size", &link_cell_size, Param::OPTIONAL); // XD_ADD_P chaine name of the collision normal when using FT
   p.ajouter("collision_duration", &collision_duration_, Param::REQUIRED); // XD_ADD_P double duration of the collision in seconds;
   p.ajouter("activate_collision_before_impact", &is_collision_activated_before_impact_, Param::REQUIRED); // XD_ADD_P int activate collision before impact (1) or not (0)
   p.ajouter("activation_distance_percentage_diameter", &activation_distance_percentage_diameter_, Param::REQUIRED); // XD_ADD_P double activation distance of the collision process as a percentage of the particle diameter
@@ -143,14 +141,6 @@ int Collision_Model_FT_base::lire_motcle_non_standard(const Motcle& word, Entree
         }
       return 1;
     }
-  else if (word=="detection_option")
-    {
-      Motcles words;
-      words.add("naive");
-      words.add("octree");
-      words.add("zlc");
-      return 1;
-    }
   else
     {
       Cerr << word << " is not a keyword understood by " << que_suis_je() <<
@@ -165,10 +155,9 @@ void Collision_Model_FT_base::reset()
   const int nb_boundaries=2*dimension;
   F_old_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
   F_now_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
-  closest_indices.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
-  closest_indices = -1;
   e_eff_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
   e_eff_t.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
+  tangential_displacement.resize(dimension);
   Cerr << "WARNING: Collision_Model_FT_base::reset of F_old_, F_now_, "
        "lagrangian_contact_forces_ and e_eff_." << finl;
 }
@@ -720,8 +709,6 @@ DoubleTab Collision_Model_FT_base::compute_contact_force(
       const double e_eff_particle = is_compression_step ? 1 : e_eff_(particle_i, particle_j);
       const double stiffness = is_collision_part_part ? stiffness_breugem_part_part_:
                                stiffness_breugem_wall_part_;
-      // if(e_eff_particle==0) {std::cout<<"tttttttttttttttttttttttttttttttttttttttttttttttttttt e eff est nul"<<std::endl; exit(0);}
-      // if(stiffness==0) {std::cout<<"tttttttttttttttttttttttttttttttttttttttttttttttttttt stiffness est nul"<<std::endl; exit(0);}
       for (int d = 0; d < dimension; d++)
         force_contact(d)= -pow(e_eff_particle,2) * stiffness * next_dist_int * norm(d);
     }
@@ -740,7 +727,7 @@ DoubleTab Collision_Model_FT_base::compute_contact_force(
   return force_contact;
 }
 
-void Collision_Model_FT_base::compute_tangential_contact_force(double tangential_displacement, DoubleTab const& tang, double e_eff_particle,
+void Collision_Model_FT_base::compute_tangential_contact_force(DoubleTab const& tang, double e_eff_particle,
                                                                double friction_coef, DoubleTab const& normal_force, const int& is_compression_step, const double& is_collision_part_part,
                                                                DoubleTab& tangential_force_contact)
 {
@@ -752,7 +739,7 @@ void Collision_Model_FT_base::compute_tangential_contact_force(double tangential
 
   for(int d=0; d<dimension; ++d)
     {
-      tangential_force_contact(d) += -std::fabs(pow(e_eff_particle,2) * stiffness * tangential_displacement);
+      tangential_force_contact(d) = -/*pow(e_eff_particle,2) **/ stiffness * tangential_displacement(d);
     }
   double f_static_t = sqrt(local_carre_norme_vect(tangential_force_contact));
   if(f_static_t>std::fabs(friction_coef*f_dynamic_n))
@@ -760,6 +747,7 @@ void Collision_Model_FT_base::compute_tangential_contact_force(double tangential
       for(int d=0; d<dimension; ++d)
         {
           tangential_force_contact(d) = -std::fabs(friction_coef*f_dynamic_n) * tang(d);
+          tangential_displacement(d) = friction_coef * f_dynamic_n/stiffness * tang(d);
         }
     }
 }

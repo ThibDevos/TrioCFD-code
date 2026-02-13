@@ -108,7 +108,7 @@ public:
     const int& particle_j,
     const int& is_compression_step,
     const double& is_collision_part_part);
-  void compute_tangential_contact_force(double tangential_displacement, DoubleTab const& tang, double e,
+  void compute_tangential_contact_force( DoubleTab const& tang, double e,
                                         double friction_coef, DoubleTab const& normal_force, const int& is_compression_step, const double& is_collision_part_part,
                                         DoubleTab& tangential_force_contact);
 
@@ -190,7 +190,6 @@ protected:
   DoubleTab e_eff_t; // effective tangential restitution coefficient
   DoubleTab F_old_;
   DoubleTab F_now_;
-  IntTab closest_indices;
   DoubleTab lagrangian_contact_forces_;
   DoubleTab lagrangian_contact_moments_;
   DoubleVect collision_detected_;
@@ -223,14 +222,13 @@ protected:
   double stiffness_breugem_wall_part_tangent = 0;
   double damper_breugem_part_part_ = 0;
   double damper_breugem_wall_part_ = 0;
+  DoubleTab tangential_displacement;
 
   enum class Collision_model { HYBRID_ESI, BREUGEM };
   Collision_model collision_model_ = Collision_model::HYBRID_ESI;
 
   enum class Detection_method { CHECK_ALL, VERLET, LC_VERLET};
   Detection_method detection_method_ = Detection_method::CHECK_ALL;
-
-  double link_cell_size=1.;
 };
 
 #endif

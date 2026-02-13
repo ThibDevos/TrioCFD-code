@@ -7124,10 +7124,10 @@ void Transport_Interfaces_FT_Disc::calculer_vitesse_repere_local(const Maillage_
       if (norme_carre != 0.)
         {
           prodscal /= norme_carre;
-          deplacement(som, 0) = (nx * prodscal* (1-is_solid_particle) + Vitesses(compo, 0) + v_R[0]);
-          deplacement(som, 1) = (ny * prodscal* (1-is_solid_particle) + Vitesses(compo, 1) + v_R[1]);
+          deplacement(som, 0) = nx * prodscal* (1-is_solid_particle) + Vitesses(compo, 0) + v_R[0];
+          deplacement(som, 1) = ny * prodscal* (1-is_solid_particle) + Vitesses(compo, 1) + v_R[1];
           if (dim3)
-            deplacement(som, 2) = (nz * prodscal* (1-is_solid_particle) + Vitesses(compo, 2) + v_R[2]); // BugFix reported from baltik TCL on 2020/10/26
+            deplacement(som, 2) = nz * prodscal* (1-is_solid_particle) + Vitesses(compo, 2) + v_R[2]; // BugFix reported from baltik TCL on 2020/10/26
         }
     }
 }
@@ -9598,7 +9598,6 @@ void Transport_Interfaces_FT_Disc::calculer_vitesses_rotation(const Maillage_FT_
           for(int j=0; j<dimension; ++j)
             {
               AtA(i,j) = A(i,j);
-              A(i,j) = 0.; //clean A
             }
         }
       AtA.inverse(); //AtA is now the inverse of AtA previously computed
