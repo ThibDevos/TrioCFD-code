@@ -735,7 +735,7 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               // DoubleTab next_dX(dimension);
               // for (int d = 0; d < dimension; d++)
               //   next_dX(d) = dX(d) + deltat_simu * dU(d);
-/*              double a = solid_particle.get_x_radius();
+              double a = solid_particle.get_x_radius();
               double b = solid_particle.get_y_radius();
               double c = solid_particle.get_z_radius();
               DoubleTab P(dimension);
@@ -743,9 +743,9 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
               P(1) = particles_position(ind_particle_i, 1) - collision_point(1);
               P(2) = particles_position(ind_particle_i, 2) - collision_point(2);
               double gaussian_curvature = pow(local_prodscal(norm, P),4)/(a*a*b*b*c*c);
-              const double effective_radius = 1/sqrt(gaussian_curvature) */;
-	      	      const double effective_radius = is_particle_particle_collision ? solid_particle.get_equivalent_radius()/2 :
-                                            solid_particle.get_equivalent_radius();
+              const double effective_radius = 1/sqrt(gaussian_curvature) ;
+/*	      	      const double effective_radius = is_particle_particle_collision ? solid_particle.get_equivalent_radius()/2 :
+                                            solid_particle.get_equivalent_radius();*/
               const double impact_Stokes = solid_density * 2 * effective_radius * impact_velocity /
                                            (9 * fluid_viscosity);
 	      Cerr<<"Stokes : "<<impact_Stokes<<std::endl;
@@ -786,10 +786,11 @@ void Collision_Model_FT_ellipsoid::compute_lagrangian_contact_forces(const Fluid
 	      {
               	tangential_displacement(d) += dUt(d) * deltat_simu;
 	      }
-	      compute_tangential_contact_force(tang, e_eff_t(particle_i,particle_j), friction_coef, force_contact, dU_scal_norm<=0, is_particle_particle_collision,tangential_force_contact);
+	      double alpha = 2./7.*(effective_radius/solid_particle.get_equivalent_radius());
+	      compute_tangential_contact_force(tang, alpha, friction_coef, force_contact, dU_scal_norm<=0, is_particle_particle_collision,tangential_force_contact);
               for(int d=0; d<dimension; ++d)
                 {
-                //  force_contact(d) += tangential_force_contact(d);
+                  force_contact(d) += tangential_force_contact(d);
                 }
               fft<<"Proc "<<Process::me()<<" "<<t<<" "<<tangential_force_contact(0)<<" "<<tangential_force_contact(1)<<" "<<tangential_force_contact(2)<<" "<<
 		      tangential_displacement(0)<<" "<<tangential_displacement(1)<<" "<<tangential_displacement(2)<<"\n";

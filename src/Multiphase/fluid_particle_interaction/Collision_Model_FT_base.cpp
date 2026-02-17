@@ -727,15 +727,17 @@ DoubleTab Collision_Model_FT_base::compute_contact_force(
   return force_contact;
 }
 
-void Collision_Model_FT_base::compute_tangential_contact_force(DoubleTab const& tang, double e_eff_particle,
+void Collision_Model_FT_base::compute_tangential_contact_force(DoubleTab const& tang, double alpha,
                                                                double friction_coef, DoubleTab const& normal_force, const int& is_compression_step, const double& is_collision_part_part,
                                                                DoubleTab& tangential_force_contact)
 {
   DoubleTab force(dimension), f_dynamic(dimension), f_static(dimension);
   double f_dynamic_n = sqrt(local_carre_norme_vect(normal_force));
-  const double stiffness = is_collision_part_part ? stiffness_breugem_part_part_tangent:
-                           stiffness_breugem_wall_part_tangent;
+  double stiffness = is_collision_part_part ? stiffness_breugem_part_part_:
+                           stiffness_breugem_wall_part_;
 
+  stiffness*=alpha;
+  Cerr<<"alpha = "<<alpha<<endl;
 
   for(int d=0; d<dimension; ++d)
     {
