@@ -246,7 +246,7 @@ void Z_Curve_Link_Cell::compute_neighbours()
                   search_leaf.Morton_code = n_code;
                   begin = std::chrono::steady_clock::now();
                   // auto found_it = leaves.end();
-                  auto found_it = std::lower_bound(it+1, leaves.end(), search_leaf, [](const leaf& a, const leaf&b) {return a.Morton_code<b.Morton_code;}); //we use the fact that the leaves are ordered
+                  auto found_it = std::lower_bound(leaves.begin(), leaves.end(), search_leaf, [](const leaf& a, const leaf&b) {return a.Morton_code<b.Morton_code;}); //we use the fact that the leaves are ordered
                   // for(auto it_n = it+1; it_n!= leaves.end(); it_n++)
                   //   {
                   //     if(it_n->Morton_code==n_code)
@@ -272,6 +272,7 @@ void Z_Curve_Link_Cell::compute_neighbours()
       nb_n += (int)current_leaf.neighbours.size();
     }
   f<<time<<" "<<time/leaves.size()<<"\n";
+  f.close();
 }
 
 void Z_Curve_Link_Cell::print_indices(const ArrOfInt& compo_connexes_sommets)

@@ -223,7 +223,7 @@ protected:
   double stiffness_breugem_wall_part_tangent = 0;
   double damper_breugem_part_part_ = 0;
   double damper_breugem_wall_part_ = 0;
-
+  DoubleTab tangential_displacement;
   enum class Collision_model { HYBRID_ESI, BREUGEM };
   Collision_model collision_model_ = Collision_model::HYBRID_ESI;
 

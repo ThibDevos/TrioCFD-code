@@ -169,6 +169,7 @@ void Collision_Model_FT_base::reset()
   closest_indices = -1;
   e_eff_.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
   e_eff_t.resize(nb_particles_tot_,nb_particles_tot_+nb_boundaries);
+  tangential_displacement.resize(dimension);
   Cerr << "WARNING: Collision_Model_FT_base::reset of F_old_, F_now_, "
        "lagrangian_contact_forces_ and e_eff_." << finl;
 }
@@ -740,19 +741,19 @@ DoubleTab Collision_Model_FT_base::compute_contact_force(
   return force_contact;
 }
 
-void Collision_Model_FT_base::compute_tangential_contact_force(double tangential_displacement, DoubleTab const& tang, double e_eff_particle,
+void Collision_Model_FT_base::compute_tangential_contact_force(double alpha, DoubleTab const& tang, double e_eff_particle,
                                                                double friction_coef, DoubleTab const& normal_force, const int& is_compression_step, const double& is_collision_part_part,
                                                                DoubleTab& tangential_force_contact)
 {
   DoubleTab force(dimension), f_dynamic(dimension), f_static(dimension);
   double f_dynamic_n = sqrt(local_carre_norme_vect(normal_force));
-  const double stiffness = is_collision_part_part ? stiffness_breugem_part_part_tangent:
+  double stiffness = is_collision_part_part ? stiffness_breugem_part_part_tangent:
                            stiffness_breugem_wall_part_tangent;
-
-
+  //stiffness *=alpha;
+  
   for(int d=0; d<dimension; ++d)
     {
-      tangential_force_contact(d) += -std::fabs(pow(e_eff_particle,2) * stiffness * tangential_displacement);
+      tangential_force_contact(d) = -stiffness * tangential_displacement(d);
     }
   double f_static_t = sqrt(local_carre_norme_vect(tangential_force_contact));
   if(f_static_t>std::fabs(friction_coef*f_dynamic_n))
@@ -760,7 +761,8 @@ void Collision_Model_FT_base::compute_tangential_contact_force(double tangential
       for(int d=0; d<dimension; ++d)
         {
           tangential_force_contact(d) = -std::fabs(friction_coef*f_dynamic_n) * tang(d);
-        }
+          tangential_displacement(d) = friction_coef * f_dynamic_n/stiffness*tang(d);
+       	}
     }
 }
 

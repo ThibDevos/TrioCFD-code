@@ -26,9 +26,9 @@ Solid_Particle_ellipsoid::Solid_Particle_ellipsoid()
 Entree& Solid_Particle_ellipsoid::readOn (Entree& is)
 {
   Solid_Particle_base::readOn(is); // do to first
-  set_equivalent_diameter(get_max_radius()*2); // for impact activation distance and Verlet tables detection
   set_volume(4. * M_PI * x_radius * y_radius * z_radius / 3.);
   set_equivalent_radius(std::cbrt(3.*volume_/(4.*M_PI))); // for impact activation distance and Verlet tables detection
+  set_equivalent_diameter(get_equivalent_radius()*2); // for impact activation distance and Verlet tables detection
 
   const double solid_density = masse_volumique().valeurs()(0, 0);
   set_mass(volume_*solid_density);
