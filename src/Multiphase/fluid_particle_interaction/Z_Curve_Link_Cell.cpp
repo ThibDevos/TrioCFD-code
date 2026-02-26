@@ -202,10 +202,12 @@ void Z_Curve_Link_Cell::build_leaves(const ArrOfInt& compo_connexes_sommets)
 void Z_Curve_Link_Cell::compute_neighbours()
 {
   std::ofstream f;
-  f.open("lower_bound_start.txt", std::ios::app);
+  f.open("unordered_map.txt", std::ios::app);
   std::chrono::steady_clock::time_point begin;
   std::chrono::steady_clock::time_point end;
   auto time =  std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
+  std::map<uint64_t, size_t> morton_to_idx;
+  for(size_t i=0; i<leaves.size(); ++i) {morton_to_idx[leaves[i].Morton_code] = i;}
   uint32_t x, y, z;
   int nb_n = 0;
   for (auto it = leaves.begin(); it != leaves.end(); ++it)
@@ -245,27 +247,19 @@ void Z_Curve_Link_Cell::compute_neighbours()
                   leaf search_leaf;
                   search_leaf.Morton_code = n_code;
                   begin = std::chrono::steady_clock::now();
-                  // auto found_it = leaves.end();
-                  auto found_it = std::lower_bound(leaves.begin(), leaves.end(), search_leaf, [](const leaf& a, const leaf&b) {return a.Morton_code<b.Morton_code;}); //we use the fact that the leaves are ordered
-                  // for(auto it_n = it+1; it_n!= leaves.end(); it_n++)
-                  //   {
-                  //     if(it_n->Morton_code==n_code)
-                  //       {
-                  //         found_it = it_n;
-                  //         break;
-                  //       }
-                  //     if(it_n->Morton_code > n_code)
-                  //       {
-                  //         break;
-                  //       }
+                  auto found_it = morton_to_idx.find(n_code);
 
-                  //   }
+		  //auto found_it = std::lower_bound(leaves.begin(), leaves.end(), search_leaf, [](const leaf& a, const leaf&b) {return a.Morton_code<b.Morton_code;}); //we use the fact that the leaves are ordered
                   end = std::chrono::steady_clock::now();
                   time += std::chrono::duration_cast<std::chrono::nanoseconds>(end - begin).count();
-                  if(found_it!=leaves.end() && found_it->Morton_code == n_code)
-                    {
-                      current_leaf.neighbours.push_back(&leaves[found_it - leaves.begin()]);
-                    }
+                  //if(found_it!=leaves.end() && found_it->Morton_code == n_code)
+                  //  {
+                  //    current_leaf.neighbours.push_back(&leaves[found_it - leaves.begin()]);
+                  //  }
+		  if (found_it != morton_to_idx.end()) // n_code might not exist if there is no vertex in this zone
+                  {
+                    current_leaf.neighbours.push_back(&leaves[found_it->second]);
+                  }
                 }
             }
         }
