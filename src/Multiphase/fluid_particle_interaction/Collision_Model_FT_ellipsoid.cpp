@@ -793,7 +793,6 @@ std::cerr.flush();*/
   for (int ind_particle_i = 0; ind_particle_i < nb_real_particles_; ind_particle_i++)
     {
 
-      Cerr<<ind_particle_i<<"/"<<nb_real_particles_<<endl;
       int particle_i=get_particle_i(ind_particle_i);
       int nb_particles_j=get_nb_particles_j(ind_particle_i);
       int ind_start_part_j=get_ind_start_particles_j(ind_particle_i);
@@ -847,7 +846,6 @@ std::cerr.flush();*/
 
               if(detection_option==Detection_Option::NAIVE)
                 {
-                  std::cout<<"use naive"<<std::endl;
                   begin_naive = std::chrono::steady_clock::now();
                   compute_dX(collisions_param[ind_particle_j].dX, collisions_param[ind_particle_j], particles_position, is_particle_particle_collision, compo_sommets, sommets_facets, mesh);
                   end_naive = std::chrono::steady_clock::now();
@@ -856,7 +854,6 @@ std::cerr.flush();*/
 
               if(is_particle_particle_collision)
                 {
-                  std::cout<<"is part part col"<<std::endl;
                   if(collisions_param[ind_particle_j].i_j_are_close)
                     {
 			    compute_norm(norm, collisions_param[ind_particle_j], sommets_facets, mesh);
@@ -940,18 +937,18 @@ std::cerr.flush();*/
                     }
                 }
             }
-          std::ofstream ffn, fft/*, fm*/, fu, fd, ft;
+         /* std::ofstream ffn, fft, fm, fu, fd, ft;
           std::string path;
           path = fichier_debug + "normal_force_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
           ffn.open(path, std::ios::app);
           path = fichier_debug + "tangent_force_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
           fft.open(path, std::ios::app);
-/*          path = fichier_debug + "moment_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
-          fm.open(path, std::ios::app);*/
+          path = fichier_debug + "moment_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
+          fm.open(path, std::ios::app);
           path = fichier_debug + "vitesse_impact_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
           fu.open(path, std::ios::app);
           path = fichier_debug + "distance_" + std::to_string(particle_i)+"_P"+std::to_string(Process::me())+".txt";
-          fd.open(path, std::ios::app);
+          fd.open(path, std::ios::app);*/
 
 	  // Check if the current proc is the one that has to compute the force
           //DoubleTab dist(1); //can use mp_min_for_each_item only with TRUSTArray
@@ -1017,9 +1014,9 @@ std::cerr.flush();*/
                                         dU_scal_norm<=0,
                                         is_particle_particle_collision);
 
-              ffn<<"Proc "<<Process::me()<<" "<<t<<" "<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
-              fu<<"Proc "<<Process::me()<<" "<<t<<" "<<dUn(0)<<" "<<dUn(1)<<" "<<dUn(2)<<" "<<impact_velocity<<"\n";
-              fd<<"Proc "<<Process::me()<<" "<<t<<" "<<dist_between_particles<<" "<<norm(0)<<" "<<norm(1)<<" "<<norm(2)<<"\n";
+        //      ffn<<"Proc "<<Process::me()<<" "<<t<<" "<<force_contact(0)<<" "<<force_contact(1)<<" "<<force_contact(2)<<"\n";
+        //      fu<<"Proc "<<Process::me()<<" "<<t<<" "<<dUn(0)<<" "<<dUn(1)<<" "<<dUn(2)<<" "<<impact_velocity<<"\n";
+        //      fd<<"Proc "<<Process::me()<<" "<<t<<" "<<dist_between_particles<<" "<<norm(0)<<" "<<norm(1)<<" "<<norm(2)<<"\n";
               /*if(is_particle_particle_collision)
                 {
 
@@ -1054,7 +1051,7 @@ std::cerr.flush();*/
                 {
                   force_contact(d) -= tangential_force_contact(d);
                 }
-              fft<<"Proc "<<Process::me()<<" "<<t<<" "<<tangential_force_contact(0)<<" "<<tangential_force_contact(1)<<" "<<tangential_force_contact(2)<<"\n";
+      //        fft<<"Proc "<<Process::me()<<" "<<t<<" "<<tangential_force_contact(0)<<" "<<tangential_force_contact(1)<<" "<<tangential_force_contact(2)<<"\n";
 
 
 
@@ -1130,19 +1127,32 @@ std::cerr.flush();*/
   auto tot_closest_mlo =Process::mp_sum(closest_mlo);
   auto tot_const_octrcee =Process::mp_sum(construction_octree);
   auto tot_closest_octree =Process::mp_sum(closest_octree);
+  auto tot_naive =Process::mp_sum(time_naive);
   std::string path;
       std::fstream ft;
   if(Process::me()==0)
     {
-      path = fichier_debug + "mlo.txt";
-      ft.open(path, std::ios::app);
+      if(detection_option==Detection_Option::NAIVE)	
+      {      path = fichier_debug + "naive.txt";
+      	ft.open(path, std::ios::app);
 
-      ft<<t<<" "<<tot_const_mlo<<" "<<tot_closest_mlo<<" "<<tot_const_mlo+tot_closest_mlo<<std::endl;
-      ft.close();
+      	ft<<t<<" "<<tot_naive<<std::endl;
+      	ft.close();
+      }
+      if(detection_option==Detection_Option::ZLC)	
+      {      path = fichier_debug + "mlo.txt";
+      	ft.open(path, std::ios::app);
+
+      	ft<<t<<" "<<tot_const_mlo<<" "<<tot_closest_mlo<<" "<<tot_const_mlo+tot_closest_mlo<<std::endl;
+      	ft.close();
+      }
+      if(detection_option==Detection_Option::OCTREE)
+      {	      
       path = fichier_debug + "octree.txt";
       ft.open(path, std::ios::app);
       ft<<t<<" "<<tot_const_octrcee<<" "<<tot_closest_octree<<" "<<tot_const_octrcee+tot_closest_octree<<std::endl;
       ft.close();
+      }
     }
 
   mp_sum_for_each_item(lagrangian_contact_forces_);
